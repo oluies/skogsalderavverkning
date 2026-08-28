@@ -100,3 +100,44 @@ z-score across the 21 counties and combines them as a weighted *mean* of the ava
 components — not a sum, which would pull a county missing a driver toward the middle.
 Weights are adjustable in the page precisely because there is no objectively correct
 weighting; the index shows where drivers coincide, and establishes no causal chain.
+
+## Licence and attribution
+
+The MIT licence in `LICENSE` covers **the code in this repository only** — the
+scripts, the SQL and the page. It does not relicense the underlying data.
+
+The published page and `site/payload.json` contain figures derived from three
+third-party open datasets, each of which keeps its own terms and needs
+attribution when reused:
+
+- **SLU Skogsstatistik / Riksskogstaxeringen** — Swedish official forest
+  statistics, Sveriges lantbruksuniversitet. <https://skogsstatistik.slu.se>
+- **SMHI open data** (metobs parameters 2, 8, 22, 23) — Sveriges meteorologiska
+  och hydrologiska institut, published under Creative Commons Erkännande 4.0
+  (CC BY 4.0). <https://opendata.smhi.se>
+- **Natural Earth** 10m admin-1 boundaries — public domain.
+  <https://www.naturalearthdata.com>
+
+If you reuse the figures, cite SLU and SMHI rather than this repository. Note
+that the numbers here are *derived* — five-year means restated, anomalies
+computed against a 1961–1990 baseline, stations aggregated to counties — so they
+are not interchangeable with the publishers' own series.
+
+## Deployment
+
+`.github/workflows/pages.yml` deploys to GitHub Pages on every push to `main`
+that touches `site/`. CI does not refetch the data: a full refresh pulls roughly
+30 MB from rate-limited APIs and takes several minutes, so the committed
+`site/payload.json` is the deployed artifact. To refresh, re-run the build steps
+above locally and commit the result.
+
+`scripts/verify.py` runs first and fails the build on the three things that have
+actually gone wrong here: `payload.json` drifting from the copy inlined in the
+page, a translation key defined in one language but not the other, and a page
+script that does not parse.
+
+`scripts/build_pages.py` wraps `site/index.html` into a standalone document.
+The source file is deliberately a *fragment* — no `<!doctype>`, `<html>` or
+`<head>` — because the Claude Artifact host supplies those at publish time.
+Served raw, that fragment would render in quirks mode, so the Pages build adds
+the document shell and hoists the font links and stylesheet into `<head>`.

@@ -1,0 +1,56 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - 'scripts/build_pages.py'
+      - 'scripts/verify.py'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+# Allow one concurrent deployment; don't cancel a run that is mid-deploy.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # The page has no dependencies to install: the ETL is Python stdlib only
+      # and the page ships as one static file with no framework and no bundler.
+      # So CI only has to verify what is committed and wrap it for Pages.
+      - name: Verify page
+        run: python3 scripts/verify.py
+
+      - name: Build standalone document
+        run: python3 scripts/build_pages.py
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
