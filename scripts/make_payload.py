@@ -38,8 +38,35 @@ for c in counties:
                         "pct": round(100 * (b1 / b0 - 1), 2), "w": round(w, 2)})
 
 stations = len(rd("stations.json"))
+# --- precipitation, snow, species, disturbance, drivers ---
+def nest(rows, k1, k2, val):
+    out = {}
+    for r in rows:
+        out.setdefault(r[k1], {})[r[k2]] = r[val]
+    return out
+
+def nest3(rows, k1, k2, k3, val):
+    out = {}
+    for r in rows:
+        out.setdefault(r[k1], {}).setdefault(r[k2], {})[r[k3]] = r[val]
+    return out
+
+precC = nest(rd("precip_county.json"), "area", "year", "anom_pct")
+precR = nest(rd("precip_region.json"), "region", "year", "anom_pct")
+snowC = nest(rd("snow_county.json"),  "area", "year", "anom_days")
+snowR = nest(rd("snow_region.json"),  "region", "year", "anom_days")
+drivers = {r["area"]: r for r in rd("drivers.json")}
+standT  = nest3(rd("stand_type.json"), "area", "stand_type", "year", "share_pct")
+fellSp  = nest3(rd("felling_species.json"), "region", "species", "year", "mm3sk")
+fellTy  = nest3(rd("felling_type.json"), "region", "harvest_type", "year", "value")
+damage  = nest3(rd("damage.json"), "region", "damage_type", "year", "share_pct")
+natLoss = nest3(rd("natural_loss.json"), "region", "species", "year", "mm3sk")
+
 payload = {"counties": counties, "age": age, "site": site,
            "climC": clim_c, "climR": clim_r, "scatter": scatter,
+           "precC": precC, "precR": precR, "snowC": snowC, "snowR": snowR,
+           "drivers": drivers, "standT": standT, "fellSp": fellSp,
+           "fellTy": fellTy, "damage": damage, "natLoss": natLoss,
            "nStations": stations}
 with open("site/payload.json", "w") as fh:
     json.dump(payload, fh, ensure_ascii=False, separators=(",", ":"))

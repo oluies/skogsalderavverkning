@@ -1,90 +1,45 @@
-"""Fetch SMHI monthly precipitation (param 23) and daily snow depth (param 8).
+"""Fetch SMHI monthly precipitation (parameter 23) and daily snow depth (param 8).
 
-Snow depth is daily over ~900 stations, so it is aggregated to one row per
-station per *snow year* (Jul-Jun, so a winter is not split across two rows)
-inside this script rather than written out raw.
+Snow depth is daily over ~1900 stations, so it is aggregated per station and
+month here rather than written out raw. Per month rather than per season,
+because "days with snow cover" over a whole season is biased by how long each
+station reports: one reporting Oct-Apr and one reporting Nov-Mar are not
+comparable. Keeping months lets the build pin a fixed December-March window.
 
-Writes data/raw/smhi_precip_monthly.csv and data/raw/smhi_snow_season.csv.
+Exits non-zero if any station download failed.
 """
-import csv, io, sys, time, json, urllib.request
+import csv, sys
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 
-BASE = "https://opendata-download-metobs.smhi.se/api/version/1.0/parameter"
+sys.path.insert(0, "scripts")
+import smhi
+
 OUT = "data/raw"
+failures = []
 
 
-def get(url, tries=4):
-    for a in range(tries):
-        try:
-            req = urllib.request.Request(url, headers={"User-Agent": "skogsalder/1.0"})
-            return urllib.request.urlopen(req, timeout=120).read()
-        except Exception:
-            if a == tries - 1:
-                return None
-            time.sleep(2 * (a + 1))
-    return None
-
-
-def rows_for(param, station_id):
-    """Yield (date, value) from a station's corrected archive."""
-    raw = get(f"{BASE}/{param}/station/{station_id}/period/corrected-archive/data.csv")
-    if not raw:
-        return
-    lines = raw.decode("utf-8-sig", errors="replace").splitlines()
-    start = None
-    for i, ln in enumerate(lines):
-        f0 = ln.split(";")[0].strip().strip('"')
-        if f0 in ("Datum", "Från Datum Tid (UTC)", "Från Datum"):
-            start = i
-            break
-    if start is None:
-        return
-    rdr = csv.reader(io.StringIO("\n".join(lines[start:])), delimiter=";")
-    hdr = next(rdr, None)
-    if not hdr:
-        return
-    cols = [c.strip() for c in hdr]
+def _rows(param, station_id):
     try:
-        di = cols.index("Datum")
-    except ValueError:
-        di = 1 if len(cols) > 1 else 0
-    vi = None
-    for cand in ("Nederbördsmängd", "Snödjup", "Lufttemperatur"):
-        if cand in cols:
-            vi = cols.index(cand)
-            break
-    if vi is None:
-        vi = di + 1
-    for r in rdr:
-        if len(r) <= max(di, vi):
-            continue
-        d, v = r[di].strip(), r[vi].strip().replace(",", ".")
-        if len(d) < 7 or not v:
-            continue
-        try:
-            yield d, float(v)
-        except ValueError:
-            continue
+        return list(smhi.observations(param, station_id))
+    except smhi.FetchError as e:
+        failures.append(str(e))
+        return None
 
 
-def stations_for(param):
-    return json.loads(get(f"{BASE}/{param}.json"))["station"]
-
-
-# ---- precipitation: monthly sums, same shape as the temperature series ----
 def precip():
-    sts = stations_for(23)
+    sts = smhi.stations(23)
     print(f"precip stations: {len(sts)}", flush=True)
 
     def one(s):
-        return [(s["id"], d[:7], v) for d, v in rows_for(23, s["id"])]
+        rows = _rows(23, s["id"])
+        return [] if rows is None else [(s["id"], d[:7], v) for d, v in rows]
 
     out = []
     with ThreadPoolExecutor(max_workers=8) as ex:
         for i, res in enumerate(ex.map(one, sts)):
             out.extend(res)
-            if (i + 1) % 150 == 0:
+            if (i + 1) % 200 == 0:
                 print(f"  precip {i+1}/{len(sts)} -> {len(out)} rows", flush=True)
     with open(f"{OUT}/smhi_precip_monthly.csv", "w", newline="") as fh:
         w = csv.writer(fh)
@@ -93,36 +48,37 @@ def precip():
     print(f"PRECIP DONE rows={len(out)}", flush=True)
 
 
-# ---- snow: daily depth -> per station per snow year ----
 def snow():
-    sts = stations_for(8)
+    sts = smhi.stations(8)
     print(f"snow stations: {len(sts)}", flush=True)
 
     def one(s):
-        acc = defaultdict(lambda: [0, 0, 0.0])  # snowyear -> [obs, days_cover, maxdepth]
-        for d, v in rows_for(8, s["id"]):
+        rows = _rows(8, s["id"])
+        if rows is None:
+            return []
+        acc = defaultdict(lambda: [0, 0, 0.0])   # (year, month) -> [obs, snowdays, max]
+        for d, v in rows:
             try:
                 y, m = int(d[0:4]), int(d[5:7])
             except ValueError:
                 continue
-            sy = y if m >= 7 else y - 1     # Jul-Jun snow year, labelled by its Jul
-            a = acc[sy]
+            a = acc[(y, m)]
             a[0] += 1
-            if v >= 0.01:                   # SMHI reports snow depth in metres
+            if v >= 0.01:                        # SMHI reports snow depth in metres
                 a[1] += 1
             if v > a[2]:
                 a[2] = v
-        return [(s["id"], sy, a[0], a[1], round(a[2], 3)) for sy, a in acc.items()]
+        return [(s["id"], y, m, a[0], a[1], round(a[2], 3)) for (y, m), a in acc.items()]
 
     out = []
     with ThreadPoolExecutor(max_workers=8) as ex:
         for i, res in enumerate(ex.map(one, sts)):
             out.extend(res)
-            if (i + 1) % 150 == 0:
+            if (i + 1) % 200 == 0:
                 print(f"  snow {i+1}/{len(sts)} -> {len(out)} rows", flush=True)
-    with open(f"{OUT}/smhi_snow_season.csv", "w", newline="") as fh:
+    with open(f"{OUT}/smhi_snow_monthly.csv", "w", newline="") as fh:
         w = csv.writer(fh)
-        w.writerow(["station_id", "snow_year", "n_obs", "cover_days", "max_depth_m"])
+        w.writerow(["station_id", "year", "month", "n_obs", "snow_days", "max_depth_m"])
         w.writerows(out)
     print(f"SNOW DONE rows={len(out)}", flush=True)
 
@@ -133,3 +89,8 @@ if __name__ == "__main__":
         precip()
     if which in ("both", "snow"):
         snow()
+    print(f"failures={len(failures)}")
+    if failures:
+        for f in failures[:10]:
+            print("  FAILED:", f, file=sys.stderr)
+        sys.exit(1)

@@ -24,13 +24,26 @@ def flatten(path, out):
             keys = list(lab)
         labels.append([lab.get(kk, kk) for kk in keys])
 
+    n = 1
+    for sz in sizes:
+        n *= sz
+
+    # The expansion below pairs cell i with the i-th tuple of product(*labels).
+    # If a dimension's label list is short (a partial category.label, or a
+    # missing one falling back to codes), every subsequent row is paired with
+    # the wrong labels - silently, and the damage only shows up much later as an
+    # empty filter result in build.sql. So assert the contract instead.
+    got = [len(l) for l in labels]
+    if got != list(sizes):
+        raise ValueError(f"{path}: label counts {got} != declared sizes {list(sizes)}; "
+                         f"dimensions {dims}")
+
     val = d["value"]
     # JSON-stat allows the value collection to be a sparse dict keyed by index
     if isinstance(val, dict):
-        n = 1
-        for s in sizes:
-            n *= s
         val = [val.get(str(i)) for i in range(n)]
+    elif len(val) != n:
+        raise ValueError(f"{path}: value array has {len(val)} cells, expected {n}")
 
     with open(out, "w", newline="") as fh:
         w = csv.writer(fh)
@@ -40,7 +53,12 @@ def flatten(path, out):
             w.writerow(list(combo) + ["" if v is None else v])
     print(f"{path} -> {out}  dims={dims} sizes={sizes} cells={len(val)}")
 
+NAMES = ["fig49", "tab311a", "avv_tradslag_landsdel", "avv_huggningsarter",
+         "naturlig_avgang", "skadetyper", "bestandstyper"]
+
 if __name__ == "__main__":
-    flatten("data/raw/fig49.json",   "data/raw/fig49.csv")
-    flatten("data/raw/tab311a.json", "data/raw/tab311a.csv")
-    flatten("data/raw/tab311b.json", "data/raw/tab311b.csv")
+    import os
+    for n in NAMES:
+        src = f"data/raw/{n}.json"
+        if os.path.exists(src):
+            flatten(src, f"data/raw/{n}.csv")

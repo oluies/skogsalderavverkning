@@ -4,12 +4,14 @@ data/geo/
 data/*.duckdb
 data/*.duckdb.wal
 
-# Exported intermediates; payload.json is inlined into site/index.html
-site/geo_*.json
-site/felling_age.json
-site/site_index.json
-site/climate_*.json
-site/bonitet_dist.json
-site/stations.json
+# Intermediate exports from export.sql. make_payload.py bundles these into
+# site/payload.json, which inline_payload.py inlines into site/index.html.
+site/*.json
+!site/payload.json
 
+__pycache__/
+*.pyc
 .DS_Store
+
+# roborev snapshots
+/.roborev/
