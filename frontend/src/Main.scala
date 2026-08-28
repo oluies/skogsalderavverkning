@@ -22,6 +22,8 @@ object App:
   private val drivers  = Var(Vector.empty[Driver])
   private val themeTick = Var(0)   // bumped on theme change to force re-render
   private val nStations = Var("—")
+  private val nOffshore = Var("—")
+  private val nAll = Var("—")
 
   private def initialLang: String =
     val stored =
@@ -131,7 +133,10 @@ object App:
   private def indexValues(ds: Vector[Driver], w: Map[String, Double]): Map[String, Double] =
     val z = zScores(ds)
     ds.flatMap { d =>
-      val parts = w.collect {
+      // toVector before collect: collect on a Map returns a Map, so two drivers
+      // yielding the same weighted z-score would silently collapse into one
+      // entry and drop a contribution from both the sum and the divisor.
+      val parts = w.toVector.collect {
         case (k, weight) if weight != 0.0 && z.get(k).exists(_.contains(d.area)) =>
           (weight * z(k)(d.area), math.abs(weight))
       }
@@ -196,7 +201,8 @@ object App:
             () => Queries.fellingAge(lsaBasis.now()).map(s =>
               Charts.line(s, tNow("axYears"), zeroBased = true))
           ),
-          caption(t("s1cap").map(stripTags))
+          caption(t("s1cap").map(stripTags)),
+          ageTable()
         )
       ),
 
@@ -265,7 +271,7 @@ object App:
                   case "contorta" => ("unitShare", 1, false)
                   case _          => ("unitYears", 0, false)
                 Charts.choropleth(vals, tNow("m" + v.capitalize), tNow(unitKey), dec, div_,
-                                  counts, tNow("tipStations"))
+                                  counts, tNow("tipStations"), tNow("tipNoData"))
               }
           ),
           caption(lang.signal.combineWith(mapView.signal).map { (_, v) =>
@@ -347,7 +353,8 @@ object App:
       section("s8h", "s8p", None,
         panel(
           asyncChart(420, themeTick.signal.mapTo(()),
-            () => Queries.scatter.map(Charts.scatter)),
+            () => Queries.scatter.map(pts =>
+              Charts.scatter(pts, tNow("axIdxX"), tNow("axIdxY")))),
           caption(scatterCaption)
         )
       ),
@@ -355,9 +362,13 @@ object App:
       sectionTag(
         div(cls := "shead", div(h2(child.text <-- t("s9h")))),
         div(cls := "panel notes",
-          children <-- lang.signal.combineWith(nStations.signal).map { (l, _) =>
+          children <-- lang.signal.combineWith(nStations.signal)
+      .combineWith(nAll.signal).combineWith(nOffshore.signal).map { (l, _, _, _) =>
             I18n.notes(l).map { case (head, body) =>
-              p(b(head), " ", body.replace("{n}", nStations.now()))
+              p(b(head), " ",
+                body.replace("{n}", nStations.now())
+                    .replace("{all}", nAll.now())
+                    .replace("{off}", nOffshore.now()))
             }.toList
           }
         )
@@ -403,6 +414,33 @@ object App:
         head + " " + I18n.get(l, "scatterTail")
     }
 
+  /** The chart as a table.
+    *
+    * An ECharts canvas exposes nothing to a screen reader or to text search, so
+    * without this the numbers behind the headline chart are unreachable.
+    */
+  private def ageTable(): HtmlElement =
+    val rows = Var(Vector.empty[(Double, Map[String, Double])])
+    val cols = Theme.regions :+ "Hela landet"
+    detailsTag(
+      onMountCallback(_ => Queries.fellingAgeTable.foreach(rows.set)),
+      summaryTag(child.text <-- t("showTable")),
+      div(cls := "plot",
+        table(cls := "dtable",
+          thead(tr(th(child.text <-- t("yearLbl")), cols.map(c => th(c)))),
+          tbody(
+            children <-- rows.signal.map(_.map { (year, byRegion) =>
+              tr(
+                td(cls := "mono", f"$year%.0f"),
+                cols.map(c => td(cls := "mono",
+                  byRegion.get(c).map(v => f"$v%.0f").getOrElse("–")))
+              )
+            }.toList)
+          )
+        )
+      )
+    )
+
   private def tiles(): HtmlElement =
     val data = Var(Vector.empty[(String, Double, Double)])
     div(cls := "tiles",
@@ -439,8 +477,14 @@ object App:
     dom.document.documentElement.setAttribute("lang", lang.now())
     val mount = dom.document.getElementById("app")
     render(mount, apply())
-    Queries.meta.foreach { m =>
-      m.get("stations_joined").foreach(v => nStations.set(v.toInt.toString))
+    Queries.meta.onComplete {
+      case Success(m) =>
+        m.get("stations_temp").foreach(v => nStations.set(v.toInt.toString))
+        m.get("stations_all").foreach(v => nAll.set(v.toInt.toString))
+        m.get("stations_offshore").foreach(v => nOffshore.set(v.toInt.toString))
+      case Failure(e) =>
+        // otherwise the page quietly renders "SMHI, — stationer" with no clue why
+        dom.console.error(s"meta query failed: ${e.getMessage}")
     }
     Queries.drivers.onComplete {
       case Success(d) => drivers.set(d)

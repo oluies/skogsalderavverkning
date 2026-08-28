@@ -46,7 +46,7 @@ def flatten(path, out):
     elif len(val) != n:
         raise ValueError(f"{path}: value array has {len(val)} cells, expected {n}")
 
-    with open(out, "w", newline="") as fh:
+    with open(out, "w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh)
         w.writerow(dims + ["value"])
         for i, combo in enumerate(product(*labels)):

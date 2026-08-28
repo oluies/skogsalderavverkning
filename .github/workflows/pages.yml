@@ -21,10 +21,13 @@ on:
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
-# Allow one concurrent deployment; don't cancel a run that is mid-deploy.
+# Separate groups per event. Sharing one group would let an incoming PR build
+# cancel a deploy that is merely queued behind an in-progress run - silently,
+# leaving the site on the previous artifact. Superseded PR builds are worth
+# cancelling; a deploy never is.
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: pages-${{ github.event_name == 'push' && 'deploy' || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read

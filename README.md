@@ -9,10 +9,10 @@ for the reactive UI, and ECharts for the charts and the choropleth. The page is 
 (Swedish/English), defaulting to Swedish.
 
 The build-time half uses DuckDB + `spatial`: the county↔region mapping and the
-station→county assignment are spatial joins in SQL. The browser half ships 14 zstd
-parquet files (192 KB) that DuckDB-WASM registers as views, so every chart is fed by a
-real query rather than a precomputed blob — the ten-year moving means, for instance, are
-a window function, not a JavaScript loop.
+station→county assignment are spatial joins in SQL. The browser half ships 15 zstd
+parquet files that DuckDB-WASM registers as views, so every chart is fed by a real query
+rather than a precomputed blob — the ten-year moving means, for instance, are a window
+function over calendar years, not a JavaScript loop.
 
 ## Sources
 
@@ -56,30 +56,12 @@ python3 -m unittest discover -s tests
 python3 scripts/build_pages.py                     # -> dist/
 ```
 
-### The no-WASM variant
-
-`site/index.html` is the self-contained page kept for the Claude Artifact
-sandbox, which cannot run DuckDB-WASM. It is *not* rebuilt by the pipeline
-above; regenerate it after a data refresh with:
-
-```sh
-duckdb data/skog.duckdb < scripts/export.sql
-python3 scripts/make_payload.py
-python3 scripts/inline_payload.py
-```
-
-Nothing checks that it stays in step with the parquet, so it drifts silently if
-you skip this. That is the maintenance cost of keeping two frontends.
-
 Serve `dist/` over HTTP (not `file://` — DuckDB-WASM needs a real origin for its
 worker):
 
 ```sh
 cd dist && python3 -m http.server 8899
 ```
-
-`scripts/smhi.py` is the shared SMHI client. Both fetchers exit non-zero if any station
-download failed, so a partial fetch cannot silently become a partial climate record.
 
 ## Method notes
 
@@ -100,9 +82,13 @@ winters comparable. It also costs coverage: only 10 of 21 counties qualify.
 using a simplified boundary for the station spatial join opens gaps between counties and
 shaves the coastline, silently dropping stations. The build joins against full-resolution
 geometry and simplifies only at export. Stations on the coastline or on generalised-away
-islands are snapped to the nearest county within ~11 km; 29 genuinely offshore stations
-are left unassigned rather than attributed to a county's land climate. This recovered 70
-stations (876 → 946) and gave all 21 counties temperature coverage.
+islands are snapped to the nearest county within 11 km — measured in SWEREF99 TM, not in
+degrees, since a degree of longitude is roughly half a degree of latitude here and a
+degree threshold would be an ellipse that also mis-ranks candidate counties. 21 genuinely
+offshore stations are left unassigned rather than attributed to a county's land climate.
+Together these changes took the temperature join from 876 to 954 stations and gave all 21
+counties coverage. The figures quoted on the page come from `meta.parquet`, so they do not
+go stale when the join changes.
 
 ## The ståndort caveat
 
@@ -141,8 +127,8 @@ weighting; the index shows where drivers coincide, and establishes no causal cha
 The MIT licence in `LICENSE` covers **the code in this repository only** — the
 scripts, the SQL and the page. It does not relicense the underlying data.
 
-The published page, `site/data/` (the parquet files and `counties.json`) and
-`site/payload.json` contain figures derived from three third-party open datasets, each of which keeps its own terms and needs
+The published page and `site/data/` (the parquet files and `counties.json`) contain
+figures derived from three third-party open datasets, each of which keeps its own terms and needs
 attribution when reused:
 
 - **SLU Skogsstatistik / Riksskogstaxeringen** — Swedish official forest
@@ -202,9 +188,9 @@ the stack. If that ratio ever stops being worth it, the alternative is to precom
 chart series at build time and load DuckDB lazily only for ad-hoc queries.
 
 **It cannot run inside the Claude Artifact sandbox.** That CSP blocks the wasm fetch and
-the blob-URL worker. `site/index.html` remains as the no-WASM variant for that target;
-GitHub Pages serves the Scala.js app. Keeping both is a real maintenance cost — if the
-Artifact copy stops earning its keep, delete it and let Pages be canonical.
+the blob-URL worker, so this app is Pages-only. A second hand-rolled page used to be kept
+for that target; carrying two frontends cost more than it returned, and it was retired —
+`git log -- site/index.html` has it if it is ever wanted back.
 
 ## Dependency updates
 

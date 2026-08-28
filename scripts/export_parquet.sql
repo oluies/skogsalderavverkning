@@ -42,8 +42,15 @@ COPY (SELECT year, region, species, mm3sk FROM natural_loss
 
 -- Figures the page quotes in prose. Exported rather than hardcoded, because
 -- the station count moves whenever the spatial join changes.
-COPY (SELECT 'stations_joined' AS k, count(*)::BIGINT AS v FROM station_county)
-  TO 'site/data/meta.parquet' (FORMAT parquet, COMPRESSION zstd);
+-- stations_temp is the parameter-22 network the temperature anomalies use;
+-- precipitation and snow join through the larger union network, so the page
+-- quotes both rather than implying one number covers all three series.
+COPY (
+  SELECT 'stations_temp' AS k, (SELECT count(*) FROM station_county)::BIGINT AS v
+  UNION ALL SELECT 'stations_all', (SELECT count(*) FROM station_county_all)::BIGINT
+  UNION ALL SELECT 'stations_offshore',
+    ((SELECT count(*) FROM stations) - (SELECT count(*) FROM station_county))::BIGINT
+) TO 'site/data/meta.parquet' (FORMAT parquet, COMPRESSION zstd);
 
 -- County geometry stays GeoJSON: ECharts registerMap consumes it directly.
 COPY (SELECT slu_name, landsdel, iso,

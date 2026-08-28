@@ -6,8 +6,8 @@
 //
 // Note this cannot work inside a Claude Artifact - that sandbox's CSP blocks
 // the wasm/worker fetches. There is no fallback: `SkogDb.ready` rejects and
-// Boot.scala reports the failure in the page instead of rendering. The no-WASM
-// variant for that target is site/index.html. On GitHub Pages this runs for real.
+// Boot.scala reports the failure in the page instead of rendering blank.
+// On GitHub Pages this runs for real.
 const DUCKDB_VERSION = "1.32.0";
 const CDN = `https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@${DUCKDB_VERSION}`;
 

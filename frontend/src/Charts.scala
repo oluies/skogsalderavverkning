@@ -144,7 +144,8 @@ object Charts:
       decimals: Int,
       diverging: Boolean,
       counts: Map[String, Double] = Map.empty,
-      countsLabel: String = ""
+      countsLabel: String = "",
+      noDataLabel: String = "–"
   ): js.Object =
     val nums = values.values.toVector
     val (lo, hi) =
@@ -163,7 +164,7 @@ object Charts:
       val v = p.value
       val shown =
         if js.isUndefined(v) || v == null ||
-           js.Dynamic.global.Number(v).asInstanceOf[Double].isNaN then "–"
+           js.Dynamic.global.Number(v).asInstanceOf[Double].isNaN then noDataLabel
         else js.Dynamic.global.Number(v).applyDynamic("toFixed")(decimals).toString
       val coverage = counts.get(p.name.toString) match
         case Some(n) if countsLabel.nonEmpty =>
@@ -212,7 +213,11 @@ object Charts:
     )
 
   /** County scatter: warming against change in site productivity. */
-  def scatter(points: Vector[(String, String, Double, Double)]): js.Object =
+  def scatter(
+      points: Vector[(String, String, Double, Double)],
+      xName: String,
+      yName: String
+  ): js.Object =
     val byRegion = points.groupBy(_._2)
     val scatterTooltip: js.Function1[js.Dynamic, String] = (p: js.Dynamic) =>
       val d = p.value.asInstanceOf[js.Array[js.Any]]
@@ -235,6 +240,9 @@ object Charts:
                                          "fontFamily" -> "IBM Plex Sans, sans-serif")),
       "xAxis" -> obj(
         "type" -> "value", "scale" -> true,
+        "name" -> xName, "nameLocation" -> "end", "nameGap" -> 26,
+        "nameTextStyle" -> obj("color" -> Theme.ink3, "align" -> "right",
+                               "fontFamily" -> "IBM Plex Mono, monospace", "fontSize" -> 10.5),
         "axisLabel" -> obj("color" -> Theme.ink3, "fontSize" -> 11,
                            "fontFamily" -> "IBM Plex Mono, monospace",
                            "formatter" -> "+{value}"),
@@ -244,6 +252,9 @@ object Charts:
       ),
       "yAxis" -> obj(
         "type" -> "value", "scale" -> true,
+        "name" -> yName, "nameLocation" -> "end", "nameGap" -> 14,
+        "nameTextStyle" -> obj("color" -> Theme.ink3, "align" -> "left",
+                               "fontFamily" -> "IBM Plex Mono, monospace", "fontSize" -> 10.5),
         "axisLabel" -> obj("color" -> Theme.ink3, "fontSize" -> 11,
                            "fontFamily" -> "IBM Plex Mono, monospace",
                            "formatter" -> "{value} %"),

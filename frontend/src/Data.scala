@@ -222,7 +222,9 @@ object Queries:
 
   /** County values for one map metric, plus the station count backing each
     * where the metric comes from weather stations - a value resting on one
-    * station should not look the same as one resting on forty.
+    * station should not look the same as one resting on forty. The count is
+    * the mean over the same span as the value, not the maximum: a county whose
+    * network thinned mid-period would otherwise advertise its best year.
     */
   def mapMetric(metric: String, year: Int): Future[(Map[String, Double], Map[String, Double])] =
     val sql = metric match
@@ -233,13 +235,13 @@ object Queries:
         // three surfaces do not each label a different quantity "bonitet change"
         "SELECT area, d_bonitet_pct AS v FROM drivers"
       case "warming" =>
-        """SELECT area, avg(anom_annual) AS v, max(n_stations) AS n FROM climate_county
+        """SELECT area, avg(anom_annual) AS v, round(avg(n_stations)) AS n FROM climate_county
            WHERE year BETWEEN 2011 AND 2024 GROUP BY area"""
       case "precip" =>
-        """SELECT area, avg(anom_pct) AS v, max(n_stations) AS n FROM precip_county
+        """SELECT area, avg(anom_pct) AS v, round(avg(n_stations)) AS n FROM precip_county
            WHERE year BETWEEN 2011 AND 2024 GROUP BY area"""
       case "snow" =>
-        """SELECT area, avg(anom_days) AS v, max(n_stations) AS n FROM snow_county
+        """SELECT area, avg(anom_days) AS v, round(avg(n_stations)) AS n FROM snow_county
            WHERE year BETWEEN 2011 AND 2024 GROUP BY area"""
       case "contorta" =>
         "SELECT area, contorta_pct AS v FROM drivers"
@@ -249,7 +251,7 @@ object Queries:
         """SELECT d.area, f.age_years AS v
            FROM drivers d JOIN felling_age f
              ON f.region = d.landsdel AND f.lsa_basis = 'excl'
-           WHERE f.year = (SELECT max(year) FROM felling_age)"""
+           WHERE f.year = (SELECT max(year) FROM felling_age WHERE lsa_basis = 'excl')"""
     SkogDb.query(sql).map { rows =>
       val vs = rows.toVector.flatMap { r =>
         Decode.opt(r, "v").map(v => Decode.str(r, "area") -> v)
