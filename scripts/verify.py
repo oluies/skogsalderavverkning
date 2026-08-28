@@ -42,47 +42,25 @@ app_src = "".join(
     for f in os.listdir("frontend/src") if f.endswith(".scala") and f != "I18n.scala"
 )
 
-# Two directions, two scans - they cannot share one set.
+# "Is every referenced key defined" is no longer asked here: call sites use the
+# generated K constants, so a deleted translation fails to compile. That
+# question was asked by regex twice and got the wrong answer both times - once
+# matching only t("...") and so missing half the keys, once intersecting the
+# candidates with the key set and so being empty by construction. The compiler
+# does not have either failure mode.
 #
-# For "is every referenced key defined" the candidates must NOT be filtered by
-# the key set first: intersecting before comparing makes the answer empty by
-# construction, which is exactly how an earlier version of this check silently
-# stopped working. So extract from the shapes that actually reach the lookup
-# and compare those against the tables.
-strict = set()
-strict |= set(re.findall(r'\bt(?:Now)?\(\s*"([A-Za-z0-9_]+)"\s*\)', app_src))
-strict |= set(re.findall(r'\bI18n\.get\([^,]+,\s*"([A-Za-z0-9_]+)"\s*\)', app_src))
-# section("head", "intro", ...) and weightSlider("key", "labelKey")
-for args in re.findall(r'\bsection\(\s*"([A-Za-z0-9_]+)"\s*,\s*"([A-Za-z0-9_]+)"', app_src):
-    strict |= set(args)
-strict |= set(re.findall(r'\bweightSlider\(\s*"[A-Za-z0-9_]+"\s*,\s*"([A-Za-z0-9_]+)"', app_src))
-# value -> labelKey pairs in segmented(...) option vectors
-for block in re.findall(r'\bsegmented\((.*?)\)\)', app_src, re.S):
-    strict |= set(re.findall(r'->\s*"([A-Za-z0-9_]+)"', block))
-# the source list, Vector("srcAge", "srcBon", ...).map { k => t(k) }
-for vec in re.findall(r'Vector\(((?:\s*"src[A-Za-z0-9_]+"\s*,?)+)\)', app_src):
-    strict |= set(re.findall(r'"([A-Za-z0-9_]+)"', vec))
-# arms of a `match` feeding tNow, and (key, ...) tuples feeding tNow
-strict |= set(re.findall(r'=>\s*"((?:cap|ax|unit|m|w|c|sp|dist|tip|s\d)[A-Za-z0-9_]*)"', app_src))
-strict |= set(re.findall(r'\(\s*"((?:cap|ax|unit)[A-Za-z0-9_]+)"\s*,', app_src))
-# arms of an if-expression feeding tNow: tNow(if x then "capStand" else "capFell")
-strict |= set(re.findall(r'(?:then|else)\s*"((?:cap|ax|unit|m|w|c|sp|dist|tip|s\d)[A-Za-z0-9_]*)"', app_src))
+# What is still worth checking is that K and the tables have not drifted apart,
+# and that no key is defined but unused.
+keys_src = open("frontend/src/Keys.scala", encoding="utf-8").read()
+k_consts = set(re.findall(r'val ([A-Za-z0-9_]+): String', keys_src))
 
-# Keys built by concatenation never appear as a literal at all.
-synthesised = set()
-for v in set(re.findall(r'case "(bonitet|bchange|warming|precip|snow|contorta|age)"', app_src)) | \
-         set(re.findall(r'"(bonitet|bchange|warming|precip|snow|contorta|age)"\s*->', app_src)):
-    synthesised |= {"m" + v.capitalize(),
-                    "cap" + v.capitalize() + ("M" if v in ("precip", "snow") else "")}
-strict |= synthesised
+check("K constants match the sv table", k_consts == sv,
+      "" if k_consts == sv
+      else f"K-only={sorted(k_consts - sv)} table-only={sorted(sv - k_consts)}; "
+           "run scripts/gen_keys.py")
 
-unknown = sorted(strict - sv)
-check("all referenced string keys defined", not unknown, f"undefined: {unknown}")
-
-# For the reverse direction a broad scan is right: a key used through any shape
-# at all counts as used, and a false "unused" report would be the annoying one.
-broad = (set(re.findall(r'"([A-Za-z0-9_]+)"', app_src)) & (sv | en)) | synthesised
-unused = sorted(sv - broad)
+referenced = set(re.findall(r'\bK\.([A-Za-z0-9_]+)', app_src))
+unused = sorted(sv - referenced)
 check("no unused string keys", not unused, f"unused: {unused}")
 
 # Build inputs

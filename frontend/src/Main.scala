@@ -105,15 +105,39 @@ object App:
 
   private def panel(children: HtmlElement*): HtmlElement = div(cls := "panel", children)
 
+  /** Label and caption keys per map metric.
+    *
+    * Spelled out rather than assembled as "m" + v.capitalize: a concatenated
+    * key is the one thing K cannot make the compiler check, and these are the
+    * keys most likely to be missed when a metric is added.
+    */
+  private def metricLabel(v: String): String = v match
+    case "bonitet"  => K.mBonitet
+    case "bchange"  => K.mBchange
+    case "warming"  => K.mWarming
+    case "precip"   => K.mPrecip
+    case "snow"     => K.mSnow
+    case "contorta" => K.mContorta
+    case _          => K.mAge
+
+  private def metricCaption(v: String): String = v match
+    case "bonitet"  => K.capBonitet
+    case "bchange"  => K.capBchange
+    case "warming"  => K.capWarming
+    case "precip"   => K.capPrecipM
+    case "snow"     => K.capSnowM
+    case "contorta" => K.capContorta
+    case _          => K.capAge
+
   /** Unit key, decimals and whether the scale diverges, per map metric. */
   private def metricFormat(v: String): (String, Int, Boolean) = v match
-    case "bonitet"  => ("unitBon", 1, false)
-    case "bchange"  => ("unitPct", 1, true)
-    case "warming"  => ("unitC", 2, true)
-    case "precip"   => ("unitPrec", 1, true)
-    case "snow"     => ("unitDays", 1, true)
-    case "contorta" => ("unitShare", 1, false)
-    case _          => ("unitYears", 0, false)
+    case "bonitet"  => (K.unitBon, 1, false)
+    case "bchange"  => (K.unitPct, 1, true)
+    case "warming"  => (K.unitC, 2, true)
+    case "precip"   => (K.unitPrec, 1, true)
+    case "snow"     => (K.unitDays, 1, true)
+    case "contorta" => (K.unitShare, 1, false)
+    case _          => (K.unitYears, 0, false)
 
   private def caption(sig: Signal[String]): HtmlElement =
     p(cls := "figcap", child.text <-- sig)
@@ -190,11 +214,11 @@ object App:
       ),
 
       headerTag(
-        div(cls := "eyebrow", child.text <-- t("eyebrow")),
-        h1(child <-- t("title").map(html => foreignHtml(html))),
-        p(cls := "standfirst", child.text <-- t("standfirst")),
+        div(cls := K.eyebrow, child.text <-- t(K.eyebrow)),
+        h1(child <-- t(K.title).map(html => foreignHtml(html))),
+        p(cls := K.standfirst, child.text <-- t(K.standfirst)),
         div(cls := "src",
-          Vector("srcAge", "srcBon", "srcClim", "srcGeo").map { k =>
+          Vector(K.srcAge, K.srcBon, K.srcClim, K.srcGeo).map { k =>
             span(child.text <-- t(k).combineWith(nStations.signal).map(
               (s, n) => s.replace("{n}", n)))
           }
@@ -203,22 +227,22 @@ object App:
 
       tiles(),
 
-      section("s1h", "s1p",
-        Some(segmented(lsaBasis, Vector("excl" -> "lsaExcl", "incl" -> "lsaIncl"))),
+      section(K.s1h, K.s1p,
+        Some(segmented(lsaBasis, Vector("excl" -> K.lsaExcl, "incl" -> K.lsaIncl))),
         panel(
           asyncChart(400,
             lsaBasis.signal.combineWith(themeTick.signal).mapTo(()),
             () => Queries.fellingAge(lsaBasis.now()).map(s =>
-              Charts.line(s, tNow("axYears"), zeroBased = true))
+              Charts.line(s, tNow(K.axYears), zeroBased = true))
           ),
-          caption(t("s1cap").map(stripTags)),
+          caption(t(K.s1cap).map(stripTags)),
           ageTable()
         )
       ),
 
-      section("s2h", "s2p",
+      section(K.s2h, K.s2p,
         Some(segmented(distView, Vector(
-          "loss" -> "distLoss", "wind" -> "distWind", "beetle" -> "distBeetle"))),
+          "loss" -> K.distLoss, "wind" -> K.distWind, "beetle" -> K.distBeetle))),
         panel(
           asyncChart(360,
             distView.signal.combineWith(themeTick.signal).mapTo(()),
@@ -227,38 +251,38 @@ object App:
                 case "wind"   => Queries.damage("Vind / snö")
                 case "beetle" => Queries.damage("Granbarkborre")
                 case _        => Queries.naturalLoss
-              val axis = if distView.now() == "loss" then "axLoss" else "axShare"
+              val axis = if distView.now() == "loss" then K.axLoss else K.axShare
               f.map(s => Charts.line(s, tNow(axis), zeroBased = true,
                                      decimals = 1, showStorms = true))
           ),
           caption(lang.signal.combineWith(distView.signal).map { (_, v) =>
             tNow(v match
-              case "wind"   => "capWindNote"
-              case "beetle" => "capBeetleNote"
-              case _        => "capLossNote")
+              case "wind"   => K.capWindNote
+              case "beetle" => K.capBeetleNote
+              case _        => K.capLossNote)
           })
         ),
         panel(
-          div(cls := "eyebrow", styleAttr := "margin-bottom:12px",
-            child.text <-- t("salvageHead")),
+          div(cls := K.eyebrow, styleAttr := "margin-bottom:12px",
+            child.text <-- t(K.salvageHead)),
           asyncChart(330, themeTick.signal.mapTo(()),
             () => Queries.salvage.map(s =>
-              Charts.line(s, tNow("axLoss"), zeroBased = true,
+              Charts.line(s, tNow(K.axLoss), zeroBased = true,
                           decimals = 1, showStorms = true))),
-          caption(t("salvCap").map(stripTags))
+          caption(t(K.salvCap).map(stripTags))
         )
       ),
 
-      section("s3h", "s3p", None,
+      section(K.s3h, K.s3p, None,
         panel(
           div(cls := "ctrls",
             segmented(mapView, Vector(
-              "bonitet" -> "mBonitet", "bchange" -> "mBchange", "warming" -> "mWarming",
-              "precip" -> "mPrecip", "snow" -> "mSnow", "contorta" -> "mContorta",
-              "age" -> "mAge")),
+              "bonitet" -> K.mBonitet, "bchange" -> K.mBchange, "warming" -> K.mWarming,
+              "precip" -> K.mPrecip, "snow" -> K.mSnow, "contorta" -> K.mContorta,
+              "age" -> K.mAge)),
             div(cls := "slider",
               display <-- mapView.signal.map(v => if v == "bonitet" then "flex" else "none"),
-              label(child.text <-- t("yearLbl")),
+              label(child.text <-- t(K.yearLbl)),
               input(tpe := "range", minAttr := "1985", maxAttr := "2023", stepAttr := "1",
                 defaultValue := "2023",
                 onInput.mapToValue --> Observer[String] { v =>
@@ -274,8 +298,8 @@ object App:
                 val v = mapView.now()
                 Queries.mapMetric(v, mapYear.now()).map { (vals, counts) =>
                   val (unitKey, dec, div_) = metricFormat(v)
-                  Charts.choropleth(vals, tNow("m" + v.capitalize), tNow(unitKey), dec, div_,
-                                    counts, tNow("tipStations"), tNow("tipNoData"))
+                  Charts.choropleth(vals, tNow(metricLabel(v)), tNow(unitKey), dec, div_,
+                                    counts, tNow(K.tipStations), tNow(K.tipNoData))
                 }
             ),
             // Beside the map: the same values over time where there is a yearly
@@ -290,74 +314,74 @@ object App:
                   Queries.heatmap(v).flatMap {
                     case Some((areas, years, cells)) =>
                       Future.successful(Charts.heatmap(areas, years, cells,
-                        tNow("m" + v.capitalize), tNow(unitKey), dec, div_))
+                        tNow(metricLabel(v)), tNow(unitKey), dec, div_))
                     case None =>
                       Queries.mapMetric(v, mapYear.now()).map { (vals, _) =>
-                        Charts.ranked(vals, tNow("m" + v.capitalize), tNow(unitKey), dec, div_)
+                        Charts.ranked(vals, tNow(metricLabel(v)), tNow(unitKey), dec, div_)
                       }
                   }
               ),
               p(cls := "figcap",
                 child.text <-- lang.signal.combineWith(mapView.signal).map { (_, v) =>
-                  if Queries.hasYearlySeries(v) then tNow("capHeatmap") else tNow("capRanked")
+                  if Queries.hasYearlySeries(v) then tNow(K.capHeatmap) else tNow(K.capRanked)
                 })
             )
           ),
           caption(lang.signal.combineWith(mapView.signal).map { (_, v) =>
-            tNow("cap" + v.capitalize + (if v == "precip" || v == "snow" then "M" else ""))
+            tNow(metricCaption(v))
           })
         )
       ),
 
-      section("s4h", "s4p", None,
+      section(K.s4h, K.s4p, None,
         panel(
           div(cls := "weights",
-            weightSlider("bonitet", "wBonitet"),
-            weightSlider("temp", "wTemp"),
-            weightSlider("precip", "wPrecip"),
-            weightSlider("snow", "wSnow")
+            weightSlider("bonitet", K.wBonitet),
+            weightSlider("temp", K.wTemp),
+            weightSlider("precip", K.wPrecip),
+            weightSlider("snow", K.wSnow)
           ),
           div(cls := "maprow",
             chart(620,
               drivers.signal.combineWith(weights.signal).combineWith(lang.signal)
                 .combineWith(themeTick.signal).map { (ds, w, _, _) =>
-                  Charts.choropleth(indexValues(ds, w), tNow("tipIndex"), "", 2, true,
-                                    noDataLabel = tNow("tipNoData"))
+                  Charts.choropleth(indexValues(ds, w), tNow(K.tipIndex), "", 2, true,
+                                    noDataLabel = tNow(K.tipNoData))
                 }),
             div(
-              div(cls := "eyebrow", styleAttr := "margin-bottom:10px",
-                child.text <-- t("idxRank")),
+              div(cls := K.eyebrow, styleAttr := "margin-bottom:10px",
+                child.text <-- t(K.idxRank)),
               chart(560,
                 drivers.signal.combineWith(weights.signal).combineWith(lang.signal)
                   .combineWith(themeTick.signal).map { (ds, w, _, _) =>
-                    Charts.ranked(indexValues(ds, w), tNow("tipIndex"), "", 2, true)
+                    Charts.ranked(indexValues(ds, w), tNow(K.tipIndex), "", 2, true)
                   })
             )
           ),
-          caption(t("idxCap").map(stripTags))
+          caption(t(K.idxCap).map(stripTags))
         )
       ),
 
-      section("s5h", "s5p", None,
+      section(K.s5h, K.s5p, None,
         panel(
           asyncChart(360, themeTick.signal.mapTo(()),
             () => Queries.siteIndex.map(s =>
-              Charts.line(s, tNow("axBon"), zeroBased = true, decimals = 1))),
-          caption(t("s5cap").map(stripTags))
+              Charts.line(s, tNow(K.axBon), zeroBased = true, decimals = 1))),
+          caption(t(K.s5cap).map(stripTags))
         )
       ),
 
-      section("s6h", "s6p",
+      section(K.s6h, K.s6p,
         Some(segmented(climView, Vector(
-          "temp" -> "cTemp", "prec" -> "cPrec", "snow" -> "cSnow"))),
+          "temp" -> K.cTemp, "prec" -> K.cPrec, "snow" -> K.cSnow))),
         panel(
           asyncChart(360,
             climView.signal.combineWith(themeTick.signal).mapTo(()),
             () =>
               val axis = climView.now() match
-                case "prec" => "axPrec"
-                case "snow" => "axDays"
-                case _      => "axTemp"
+                case "prec" => K.axPrec
+                case "snow" => K.axDays
+                case _      => K.axTemp
               Queries.climate(climView.now()).map(s =>
                 // anomalies are differences from a baseline, so zero is a real
                 // reference here rather than an axis-cropping choice
@@ -365,43 +389,43 @@ object App:
           ),
           caption(lang.signal.combineWith(climView.signal).map { (_, v) =>
             tNow(v match
-              case "prec" => "capPrec"
-              case "snow" => "capSnow"
-              case _      => "capTemp")
+              case "prec" => K.capPrec
+              case "snow" => K.capSnow
+              case _      => K.capTemp)
           })
         )
       ),
 
-      section("s7h", "s7p",
-        Some(segmented(spView, Vector("stand" -> "spStand", "fell" -> "spFell"))),
+      section(K.s7h, K.s7p,
+        Some(segmented(spView, Vector("stand" -> K.spStand, "fell" -> K.spFell))),
         panel(
           asyncChart(360,
             spView.signal.combineWith(themeTick.signal).mapTo(()),
             () =>
               if spView.now() == "stand" then
                 Queries.standType.map(s =>
-                  Charts.line(s, tNow("axShare"), zeroBased = true, decimals = 1))
+                  Charts.line(s, tNow(K.axShare), zeroBased = true, decimals = 1))
               else
                 Queries.fellingSpecies.map(s =>
-                  Charts.line(s, tNow("axLoss"), zeroBased = true, decimals = 1))
+                  Charts.line(s, tNow(K.axLoss), zeroBased = true, decimals = 1))
           ),
           caption(lang.signal.combineWith(spView.signal).map { (_, v) =>
-            tNow(if v == "stand" then "capStand" else "capFell")
+            tNow(if v == "stand" then K.capStand else K.capFell)
           })
         )
       ),
 
-      section("s8h", "s8p", None,
+      section(K.s8h, K.s8p, None,
         panel(
           asyncChart(420, themeTick.signal.mapTo(()),
             () => Queries.scatter.map(pts =>
-              Charts.scatter(pts, tNow("axIdxX"), tNow("axIdxY")))),
+              Charts.scatter(pts, tNow(K.axIdxX), tNow(K.axIdxY)))),
           caption(scatterCaption)
         )
       ),
 
       sectionTag(
-        div(cls := "shead", div(h2(child.text <-- t("s9h")))),
+        div(cls := "shead", div(h2(child.text <-- t(K.s9h)))),
         div(cls := "panel notes",
           children <-- lang.signal.combineWith(nStations.signal)
       .combineWith(nAll.signal).combineWith(nOffshore.signal).map { (l, _, _, _) =>
@@ -419,10 +443,10 @@ object App:
         "© 2026 Örjan Lundberg · ",
         a(href := "https://github.com/oluies", "GitHub"), " · ",
         a(href := "https://www.linkedin.com/in/orjanlundberg/", "LinkedIn"), " · ",
-        child.text <-- t("footerSource"), " ",
+        child.text <-- t(K.footerSource), " ",
         a(href := "https://github.com/oluies/skogsalderavverkning",
           "github.com/oluies/skogsalderavverkning"), " · ",
-        child.text <-- t("footerBuilt"), " ",
+        child.text <-- t(K.footerBuilt), " ",
         a(href := "https://duckdb.org", "DuckDB"), ", ",
         a(href := "https://laminar.dev", "Scala.js + Laminar"), " & ",
         a(href := "https://echarts.apache.org", "ECharts")
@@ -447,12 +471,12 @@ object App:
         val syy = pts.map { case (_, y) => (y - my) * (y - my) }.sum
         val r  = sxy / math.sqrt(sxx * syy)
         val tv = math.abs(r) * math.sqrt((n - 2) / (1 - r * r))
-        val head = I18n.get(l, "scatterLead")
+        val head = I18n.get(l, K.scatterLead)
           .replace("{n}", n.toString)
           .replace("{r}", f"$r%.2f")
           .replace("{t}", f"$tv%.2f")
           .replace("{df}", (n - 2).toString)
-        head + " " + I18n.get(l, "scatterTail")
+        head + " " + I18n.get(l, K.scatterTail)
     }
 
   /** The chart as a table.
@@ -468,10 +492,10 @@ object App:
         case Success(r) => rows.set(r)
         case Failure(e) => dom.console.error(s"felling age table query failed: ${e.getMessage}")
       }),
-      summaryTag(child.text <-- t("showTable")),
+      summaryTag(child.text <-- t(K.showTable)),
       div(cls := "plot",
         table(cls := "dtable",
-          thead(tr(th(child.text <-- t("yearLbl")), cols.map(c => th(c)))),
+          thead(tr(th(child.text <-- t(K.yearLbl)), cols.map(c => th(c)))),
           tbody(
             children <-- rows.signal.map(_.map { (year, byRegion) =>
               tr(
@@ -492,7 +516,7 @@ object App:
       children <-- data.signal.combineWith(lang.signal).map { (rows, _) =>
         rows.map { case (region, first, last) =>
           val delta = last - first
-          val unit  = tNow("unitYears")
+          val unit  = tNow(K.unitYears)
           div(cls := "tile",
             div(cls := "rg",
               span(cls := "swatch",

@@ -21,12 +21,14 @@ on:
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
-# Group by whether the run deploys, not by event name. Every deploying run
-# (push and workflow_dispatch alike) shares one serialised group, so two
-# deploy-pages calls can never race the same environment; PR builds are grouped
-# per ref and superseded ones are cancelled. Sharing a single group across both
-# would instead let an incoming PR build cancel a merely-queued deploy and leave
-# the site on the previous artifact.
+# Group by whether the run deploys. Pushes and manual dispatches both publish
+# (see the `if:` gates below), so they share one serialised group and two
+# deploy-pages calls can never race the same environment. PR builds only
+# verify, so they are grouped per ref and superseded ones are cancelled.
+#
+# The grouping and the gates have to agree: a run that cannot deploy must not
+# sit in the deploy group, or queuing it there cancels a deploy that is merely
+# pending and the site silently stays on the previous artifact.
 concurrency:
   group: pages-${{ (github.event_name == 'pull_request' && github.ref) || 'deploy' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -65,6 +67,11 @@ jobs:
         with:
           python-version: '3.12'
 
+      # Regenerated rather than trusted: verify.py then fails if it drifted
+      # from the tables in the commit.
+      - name: Generate translation key constants
+        run: python3 scripts/gen_keys.py
+
       - name: Build Scala.js bundle
         working-directory: frontend
         run: scala-cli --power package . -o ../site/js/app.js --js -f --js-mode release
@@ -78,19 +85,21 @@ jobs:
       - name: Run tests
         run: python3 -m unittest discover -s tests -v
 
-      # Publishing steps run only for pushes; a PR proves the build and the
-      # checks pass under the proposed action versions without deploying.
+      # Publishing runs for pushes and manual dispatches; a pull request proves
+      # the build and the checks pass under the proposed action versions
+      # without deploying.
       - uses: actions/configure-pages@v6
-        if: github.event_name == 'push'
+        if: github.event_name != 'pull_request'
 
       - uses: actions/upload-pages-artifact@v5
-        if: github.event_name == 'push'
+        if: github.event_name != 'pull_request'
         with:
           path: dist
 
   deploy:
     needs: build
-    if: github.event_name == 'push'
+    # Pushes and manual dispatches publish; pull requests only build and verify.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

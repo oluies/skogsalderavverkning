@@ -48,6 +48,7 @@ duckdb data/skog.duckdb < scripts/build.sql        # tables + spatial joins
 duckdb data/skog.duckdb < scripts/export_parquet.sql   # parquet for the browser
 
 # 2. frontend  (subshell, so steps 3+ still run from the repo root)
+python3 scripts/gen_keys.py                        # Keys.scala from the sv table
 (cd frontend && scala-cli --power package . -o ../site/js/app.js --js -f --js-mode release)
 
 # 3. assemble + check
@@ -157,11 +158,19 @@ CI compiles the Scala.js bundle with scala-cli (Coursier cached on
 roughly 30 MB from rate-limited APIs, so the committed `site/data/*.parquet` is
 the deployed artifact. To refresh, run the build locally and commit the result.
 
+Translation keys are referenced through the generated `K` object, so a deleted
+translation is a compile error rather than literal key text on the page. That
+question used to be asked by a regex in `verify.py`, which got it wrong twice —
+first matching only `t("...")` and so missing half the keys, then intersecting
+the candidates with the key set and so reporting nothing at all. The compiler
+has neither failure mode. Regenerate `Keys.scala` with `scripts/gen_keys.py`
+after adding or removing a string.
+
 `scripts/verify.py` fails the build on:
 
 - a translation key defined in `sv` but not `en`, or the reverse — this once
   shipped as a literal `undefined` in a tooltip
-- a string key the app references that neither table defines
+- `Keys.scala` drifting from the tables, or a key defined but never used
 - a Scala.js bundle that did not link, or missing build inputs
 - a parquet file missing for any table `duckdb-loader.js` registers
 
