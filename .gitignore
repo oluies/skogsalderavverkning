@@ -5,7 +5,10 @@ data/*.duckdb
 data/*.duckdb.wal
 
 # Nothing writes loose JSON to site/ any more - the browser data lives in
-# site/data/ (parquet plus counties.json) and is committed.
+# site/data/ (parquet plus counties.json) and is committed. Keep ignoring the
+# old location so stale output from the retired export.sql pipeline, or from an
+# older checkout, cannot be committed by accident.
+site/*.json
 
 # Compiled by scala-cli in CI; not a source artefact
 site/js/app.js
