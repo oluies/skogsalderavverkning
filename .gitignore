@@ -4,10 +4,8 @@ data/geo/
 data/*.duckdb
 data/*.duckdb.wal
 
-# Intermediate exports from export.sql. make_payload.py bundles these into
-# site/payload.json, which inline_payload.py inlines into site/index.html.
-site/*.json
-!site/payload.json
+# Nothing writes loose JSON to site/ any more - the browser data lives in
+# site/data/ (parquet plus counties.json) and is committed.
 
 # Compiled by scala-cli in CI; not a source artefact
 site/js/app.js

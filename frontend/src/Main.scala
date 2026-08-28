@@ -291,7 +291,8 @@ object App:
           chart(620,
             drivers.signal.combineWith(weights.signal).combineWith(lang.signal)
               .combineWith(themeTick.signal).map { (ds, w, _, _) =>
-                Charts.choropleth(indexValues(ds, w), tNow("tipIndex"), "", 2, true)
+                Charts.choropleth(indexValues(ds, w), tNow("tipIndex"), "", 2, true,
+                                  noDataLabel = tNow("tipNoData"))
               }),
           caption(t("idxCap").map(stripTags))
         )
@@ -423,7 +424,10 @@ object App:
     val rows = Var(Vector.empty[(Double, Map[String, Double])])
     val cols = Theme.regions :+ "Hela landet"
     detailsTag(
-      onMountCallback(_ => Queries.fellingAgeTable.foreach(rows.set)),
+      onMountCallback(_ => Queries.fellingAgeTable.onComplete {
+        case Success(r) => rows.set(r)
+        case Failure(e) => dom.console.error(s"felling age table query failed: ${e.getMessage}")
+      }),
       summaryTag(child.text <-- t("showTable")),
       div(cls := "plot",
         table(cls := "dtable",

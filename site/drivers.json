@@ -1,0 +1,23 @@
+[
+	{"area":"Blekinge län","landsdel":"Götaland","bonitet_early":10.83,"bonitet_late":10.85,"d_bonitet_pct":0.18,"d_temp_c":1.598,"d_precip_pct":0.47,"d_snow_days":null,"contorta_pct":null},
+	{"area":"Dalarnas län","landsdel":"Svealand","bonitet_early":4.76,"bonitet_late":4.96,"d_bonitet_pct":4.2,"d_temp_c":1.922,"d_precip_pct":6.04,"d_snow_days":-7.14,"contorta_pct":0.68},
+	{"area":"Gotlands län","landsdel":"Götaland","bonitet_early":3.95,"bonitet_late":3.9,"d_bonitet_pct":-1.27,"d_temp_c":1.375,"d_precip_pct":2.96,"d_snow_days":null,"contorta_pct":0.2},
+	{"area":"Gävleborgs län","landsdel":"S Norrland","bonitet_early":5.43,"bonitet_late":5.6,"d_bonitet_pct":3.13,"d_temp_c":1.367,"d_precip_pct":2.49,"d_snow_days":-22.0,"contorta_pct":1.12},
+	{"area":"Hallands län","landsdel":"Götaland","bonitet_early":9.56,"bonitet_late":9.8,"d_bonitet_pct":2.51,"d_temp_c":1.356,"d_precip_pct":17.63,"d_snow_days":null,"contorta_pct":null},
+	{"area":"Jämtlands län","landsdel":"S Norrland","bonitet_early":3.38,"bonitet_late":3.56,"d_bonitet_pct":5.33,"d_temp_c":1.4,"d_precip_pct":9.42,"d_snow_days":-0.49,"contorta_pct":6.6},
+	{"area":"Jönköpings län","landsdel":"Götaland","bonitet_early":8.26,"bonitet_late":8.44,"d_bonitet_pct":2.18,"d_temp_c":1.62,"d_precip_pct":4.34,"d_snow_days":null,"contorta_pct":null},
+	{"area":"Kalmar län","landsdel":"Götaland","bonitet_early":8.16,"bonitet_late":8.64,"d_bonitet_pct":5.88,"d_temp_c":1.845,"d_precip_pct":0.75,"d_snow_days":null,"contorta_pct":null},
+	{"area":"Kronobergs län","landsdel":"Götaland","bonitet_early":8.82,"bonitet_late":9.14,"d_bonitet_pct":3.63,"d_temp_c":1.545,"d_precip_pct":6.63,"d_snow_days":null,"contorta_pct":null},
+	{"area":"Norrbottens län","landsdel":"N Norrland","bonitet_early":2.73,"bonitet_late":3.06,"d_bonitet_pct":12.09,"d_temp_c":1.649,"d_precip_pct":20.36,"d_snow_days":-1.05,"contorta_pct":1.84},
+	{"area":"Skåne län","landsdel":"Götaland","bonitet_early":11.24,"bonitet_late":11.33,"d_bonitet_pct":0.8,"d_temp_c":1.617,"d_precip_pct":5.88,"d_snow_days":-34.33,"contorta_pct":null},
+	{"area":"Stockholms län","landsdel":"Svealand","bonitet_early":7.14,"bonitet_late":7.51,"d_bonitet_pct":5.18,"d_temp_c":1.583,"d_precip_pct":4.3,"d_snow_days":null,"contorta_pct":null},
+	{"area":"Södermanlands län","landsdel":"Svealand","bonitet_early":7.92,"bonitet_late":8.23,"d_bonitet_pct":3.91,"d_temp_c":1.973,"d_precip_pct":-0.3,"d_snow_days":null,"contorta_pct":null},
+	{"area":"Uppsala län","landsdel":"Svealand","bonitet_early":7.31,"bonitet_late":7.42,"d_bonitet_pct":1.5,"d_temp_c":1.716,"d_precip_pct":0.38,"d_snow_days":-18.45,"contorta_pct":0.1},
+	{"area":"Värmlands län","landsdel":"Svealand","bonitet_early":6.44,"bonitet_late":6.48,"d_bonitet_pct":0.62,"d_temp_c":1.648,"d_precip_pct":11.22,"d_snow_days":-14.06,"contorta_pct":1.04},
+	{"area":"Västerbottens län","landsdel":"N Norrland","bonitet_early":3.25,"bonitet_late":3.37,"d_bonitet_pct":3.69,"d_temp_c":1.74,"d_precip_pct":9.95,"d_snow_days":-1.74,"contorta_pct":2.76},
+	{"area":"Västernorrlands län","landsdel":"S Norrland","bonitet_early":4.17,"bonitet_late":4.33,"d_bonitet_pct":3.84,"d_temp_c":1.506,"d_precip_pct":9.05,"d_snow_days":-10.5,"contorta_pct":4.26},
+	{"area":"Västmanlands län","landsdel":"Svealand","bonitet_early":7.31,"bonitet_late":7.59,"d_bonitet_pct":3.83,"d_temp_c":1.496,"d_precip_pct":2.45,"d_snow_days":null,"contorta_pct":null},
+	{"area":"Västra Götalands län","landsdel":"Götaland","bonitet_early":8.22,"bonitet_late":8.5,"d_bonitet_pct":3.41,"d_temp_c":1.732,"d_precip_pct":12.82,"d_snow_days":null,"contorta_pct":null},
+	{"area":"Örebro län","landsdel":"Svealand","bonitet_early":7.27,"bonitet_late":7.47,"d_bonitet_pct":2.75,"d_temp_c":1.565,"d_precip_pct":7.11,"d_snow_days":null,"contorta_pct":0.18},
+	{"area":"Östergötlands län","landsdel":"Götaland","bonitet_early":7.98,"bonitet_late":8.17,"d_bonitet_pct":2.38,"d_temp_c":1.522,"d_precip_pct":8.06,"d_snow_days":-62.6,"contorta_pct":null}
+]

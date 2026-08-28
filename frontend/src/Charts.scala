@@ -162,15 +162,18 @@ object Charts:
 
     val mapTooltip: js.Function1[js.Dynamic, String] = (p: js.Dynamic) =>
       val v = p.value
-      val shown =
-        if js.isUndefined(v) || v == null ||
-           js.Dynamic.global.Number(v).asInstanceOf[Double].isNaN then noDataLabel
-        else js.Dynamic.global.Number(v).applyDynamic("toFixed")(decimals).toString
-      val coverage = counts.get(p.name.toString) match
-        case Some(n) if countsLabel.nonEmpty =>
-          s"<br><span style='opacity:.7'>$countsLabel: ${n.toInt}</span>"
-        case _ => ""
-      s"<b>${p.name}</b><br>$label: <b>$shown $unit</b>$coverage"
+      val absent = js.isUndefined(v) || v == null ||
+                   js.Dynamic.global.Number(v).asInstanceOf[Double].isNaN
+      if absent then
+        // no unit here: "no data days vs 1961-90" is not a sentence
+        s"<b>${p.name}</b><br>$label: <b>$noDataLabel</b>"
+      else
+        val shown = js.Dynamic.global.Number(v).applyDynamic("toFixed")(decimals).toString
+        val coverage = counts.get(p.name.toString) match
+          case Some(n) if countsLabel.nonEmpty =>
+            s"<br><span style='opacity:.7'>$countsLabel: ${n.toInt}</span>"
+          case _ => ""
+        s"<b>${p.name}</b><br>$label: <b>$shown $unit</b>$coverage"
 
     obj(
       "animation" -> false,

@@ -42,28 +42,47 @@ app_src = "".join(
     for f in os.listdir("frontend/src") if f.endswith(".scala") and f != "I18n.scala"
 )
 
-# Keys reach the lookup by many routes: t("k") directly, but also as arguments
-# to section()/segmented()/weightSlider(), as arms of a `match`, inside tuples,
-# and via I18n.get(lang, "k"). Rather than enumerate those shapes - the previous
-# version scanned only t("...") and so missed roughly half the keys, letting a
-# deleted one pass CI and render as literal key text in an <h2> - take every
-# string literal in the app and intersect it with the defined key set.
-literals = set(re.findall(r'"([A-Za-z0-9_]+)"', app_src))
-referenced = literals & (sv | en)
+# Two directions, two scans - they cannot share one set.
+#
+# For "is every referenced key defined" the candidates must NOT be filtered by
+# the key set first: intersecting before comparing makes the answer empty by
+# construction, which is exactly how an earlier version of this check silently
+# stopped working. So extract from the shapes that actually reach the lookup
+# and compare those against the tables.
+strict = set()
+strict |= set(re.findall(r'\bt(?:Now)?\(\s*"([A-Za-z0-9_]+)"\s*\)', app_src))
+strict |= set(re.findall(r'\bI18n\.get\([^,]+,\s*"([A-Za-z0-9_]+)"\s*\)', app_src))
+# section("head", "intro", ...) and weightSlider("key", "labelKey")
+for args in re.findall(r'\bsection\(\s*"([A-Za-z0-9_]+)"\s*,\s*"([A-Za-z0-9_]+)"', app_src):
+    strict |= set(args)
+strict |= set(re.findall(r'\bweightSlider\(\s*"[A-Za-z0-9_]+"\s*,\s*"([A-Za-z0-9_]+)"', app_src))
+# value -> labelKey pairs in segmented(...) option vectors
+for block in re.findall(r'\bsegmented\((.*?)\)\)', app_src, re.S):
+    strict |= set(re.findall(r'->\s*"([A-Za-z0-9_]+)"', block))
+# the source list, Vector("srcAge", "srcBon", ...).map { k => t(k) }
+for vec in re.findall(r'Vector\(((?:\s*"src[A-Za-z0-9_]+"\s*,?)+)\)', app_src):
+    strict |= set(re.findall(r'"([A-Za-z0-9_]+)"', vec))
+# arms of a `match` feeding tNow, and (key, ...) tuples feeding tNow
+strict |= set(re.findall(r'=>\s*"((?:cap|ax|unit|m|w|c|sp|dist|tip|s\d)[A-Za-z0-9_]*)"', app_src))
+strict |= set(re.findall(r'\(\s*"((?:cap|ax|unit)[A-Za-z0-9_]+)"\s*,', app_src))
+# arms of an if-expression feeding tNow: tNow(if x then "capStand" else "capFell")
+strict |= set(re.findall(r'(?:then|else)\s*"((?:cap|ax|unit|m|w|c|sp|dist|tip|s\d)[A-Za-z0-9_]*)"', app_src))
 
-# Map metric labels and captions are assembled by concatenation, so the key
-# itself never appears as a literal.
+# Keys built by concatenation never appear as a literal at all.
+synthesised = set()
 for v in set(re.findall(r'case "(bonitet|bchange|warming|precip|snow|contorta|age)"', app_src)) | \
          set(re.findall(r'"(bonitet|bchange|warming|precip|snow|contorta|age)"\s*->', app_src)):
-    referenced |= {"m" + v.capitalize(),
-                   "cap" + v.capitalize() + ("M" if v in ("precip", "snow") else "")}
+    synthesised |= {"m" + v.capitalize(),
+                    "cap" + v.capitalize() + ("M" if v in ("precip", "snow") else "")}
+strict |= synthesised
 
-unknown = sorted(referenced - sv)
+unknown = sorted(strict - sv)
 check("all referenced string keys defined", not unknown, f"undefined: {unknown}")
 
-# The reverse direction: a key defined but referenced nowhere is either a
-# feature that was dropped without cleaning up, or a typo at the call site.
-unused = sorted(sv - referenced)
+# For the reverse direction a broad scan is right: a key used through any shape
+# at all counts as used, and a false "unused" report would be the annoying one.
+broad = (set(re.findall(r'"([A-Za-z0-9_]+)"', app_src)) & (sv | en)) | synthesised
+unused = sorted(sv - broad)
 check("no unused string keys", not unused, f"unused: {unused}")
 
 # Build inputs

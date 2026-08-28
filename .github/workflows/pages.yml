@@ -21,12 +21,14 @@ on:
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
-# Separate groups per event. Sharing one group would let an incoming PR build
-# cancel a deploy that is merely queued behind an in-progress run - silently,
-# leaving the site on the previous artifact. Superseded PR builds are worth
-# cancelling; a deploy never is.
+# Group by whether the run deploys, not by event name. Every deploying run
+# (push and workflow_dispatch alike) shares one serialised group, so two
+# deploy-pages calls can never race the same environment; PR builds are grouped
+# per ref and superseded ones are cancelled. Sharing a single group across both
+# would instead let an incoming PR build cancel a merely-queued deploy and leave
+# the site on the previous artifact.
 concurrency:
-  group: pages-${{ github.event_name == 'push' && 'deploy' || github.ref }}
+  group: pages-${{ (github.event_name == 'pull_request' && github.ref) || 'deploy' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
