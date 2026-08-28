@@ -1,0 +1,15 @@
+# Downloaded source data and the built database — reproducible via scripts/
+data/raw/
+data/geo/
+data/*.duckdb
+data/*.duckdb.wal
+
+# Exported intermediates; payload.json is inlined into site/index.html
+site/geo_*.json
+site/felling_age.json
+site/site_index.json
+site/climate_*.json
+site/bonitet_dist.json
+site/stations.json
+
+.DS_Store
