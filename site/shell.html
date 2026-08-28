@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="How Sweden's average age at final felling has changed by region, against site productivity, storms, tree species and climate. Built from SLU Riksskogstaxeringen and SMHI open data.">
+<meta name="color-scheme" content="light dark">
+<meta property="og:title" content="Sweden's Felling Age">
+<meta property="og:description" content="Swedish final felling age against site productivity, storms, species and climate. DuckDB, Scala.js + Laminar and ECharts.">
+<meta property="og:type" content="website">
+<title>Sweden's Felling Age</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap">
+<style>
+
+:root{
+  color-scheme: light;
+  --ground:#f4f6f7; --panel:#ffffff; --panel-2:#eef2f4;
+  --ink:#0e1417; --ink-2:#54626b; --ink-3:#8a969e;
+  --rule:#dde4e8; --rule-2:#c8d4da;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
+  --s5:#e87ba4; --s6:#008300;
+  --pos:#2a78d6; --neg:#e34948; --mid:#f0efec;
+  --seq1:#cde2fb; --seq2:#9ec5f4; --seq3:#5598e7; --seq4:#2a78d6; --seq5:#1c5cab; --seq6:#104281;
+  --shadow:0 1px 2px rgba(14,20,23,.05),0 8px 24px -12px rgba(14,20,23,.12);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --ground:#0f1417; --panel:#161d21; --panel-2:#1c252a;
+    --ink:#eaf0f2; --ink-2:#9bacb5; --ink-3:#6d7d86;
+    --rule:#253036; --rule-2:#33424a;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
+  --s5:#d55181; --s6:#008300;
+    --s5:#d55181; --s6:#008300;
+    --pos:#3987e5; --neg:#e66767; --mid:#383835;
+    --seq1:#0d366b; --seq2:#184f95; --seq3:#256abf; --seq4:#3987e5; --seq5:#6da7ec; --seq6:#b7d3f6;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px -12px rgba(0,0,0,.5);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --ground:#0f1417; --panel:#161d21; --panel-2:#1c252a;
+  --ink:#eaf0f2; --ink-2:#9bacb5; --ink-3:#6d7d86;
+  --rule:#253036; --rule-2:#33424a;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
+  --pos:#3987e5; --neg:#e66767; --mid:#383835;
+  --seq1:#0d366b; --seq2:#184f95; --seq3:#256abf; --seq4:#3987e5; --seq5:#6da7ec; --seq6:#b7d3f6;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px -12px rgba(0,0,0,.5);
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--ground); color:var(--ink);
+  font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  font-size:15px; line-height:1.55; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px 96px}
+h1,h2,h3{font-family:Newsreader,Georgia,"Times New Roman",serif;font-weight:500;text-wrap:balance;margin:0}
+.mono{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
+.eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);
+  font-weight:500;font-family:"IBM Plex Mono",monospace}
+
+/* ---- header ---- */
+header{padding:72px 0 40px;border-bottom:1px solid var(--rule)}
+header h1{font-size:clamp(40px,6vw,68px);line-height:1.02;letter-spacing:-.02em;margin:18px 0 0}
+header h1 em{font-style:italic;color:var(--s1)}
+.standfirst{max-width:60ch;margin:22px 0 0;font-size:17px;color:var(--ink-2)}
+.src{margin-top:26px;font-size:12.5px;color:var(--ink-3);display:flex;flex-wrap:wrap;gap:6px 18px}
+.src span{white-space:nowrap}
+
+/* ---- stat tiles ---- */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1px;
+  background:var(--rule);border:1px solid var(--rule);margin:40px 0 0;border-radius:3px;overflow:hidden}
+.tile{background:var(--panel);padding:18px 20px 20px}
+.tile .rg{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-2);font-weight:500}
+.swatch{width:10px;height:10px;border-radius:2px;flex:none}
+.tile .big{font-size:34px;line-height:1.1;margin-top:10px;letter-spacing:-.02em}
+.tile .sub{font-size:12px;color:var(--ink-3);margin-top:3px}
+
+/* ---- sections & panels ---- */
+section{margin-top:64px}
+.shead{display:flex;align-items:baseline;justify-content:space-between;gap:20px;flex-wrap:wrap;
+  border-bottom:1px solid var(--rule);padding-bottom:12px;margin-bottom:22px}
+.shead h2{font-size:27px;letter-spacing:-.01em}
+.shead p{margin:6px 0 0;color:var(--ink-2);font-size:14px;max-width:62ch}
+.panel{background:var(--panel);border:1px solid var(--rule);border-radius:3px;padding:20px;box-shadow:var(--shadow)}
+
+/* ---- controls ---- */
+.ctrls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.seg{display:inline-flex;border:1px solid var(--rule-2);border-radius:3px;overflow:hidden;background:var(--panel-2)}
+.seg button{font:inherit;font-size:12.5px;padding:6px 13px;border:0;background:transparent;color:var(--ink-2);cursor:pointer}
+.seg button+button{border-left:1px solid var(--rule-2)}
+.seg button[aria-pressed="true"]{background:var(--s1);color:#fff}
+.seg button:focus-visible{outline:2px solid var(--s1);outline-offset:-2px}
+.slider{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--ink-2)}
+.slider input[type=range]{width:min(260px,42vw);accent-color:var(--s1)}
+.yr{font-size:14px;color:var(--ink);min-width:4ch}
+
+/* ---- charts ---- */
+figure{margin:0}
+.plot{width:100%;overflow-x:auto}
+svg{display:block;max-width:100%;height:auto}
+.grid line{stroke:var(--rule);stroke-width:1}
+.axis text{fill:var(--ink-3);font-size:11px;font-family:"IBM Plex Mono",monospace}
+.axis line{stroke:var(--rule-2)}
+.lbl{font-size:11.5px;font-family:"IBM Plex Sans",sans-serif;font-weight:500}
+.line{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-2);margin-top:14px}
+.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:6px}
+figcaption{font-size:12.5px;color:var(--ink-3);margin-top:12px;max-width:70ch}
+
+/* ---- map ---- */
+.maprow{display:grid;grid-template-columns:minmax(240px,1fr) minmax(280px,1.15fr);gap:24px;align-items:start}
+@media(max-width:760px){.maprow{grid-template-columns:1fr}}
+.county{stroke:var(--panel);stroke-width:.8;cursor:pointer;transition:opacity .12s}
+.county:hover{stroke:var(--ink);stroke-width:1.6}
+.ramp{display:flex;align-items:center;gap:0;margin-top:6px}
+.ramp i{height:11px;flex:1}
+.ramprow{font-size:11px;color:var(--ink-3);display:flex;justify-content:space-between;margin-top:4px}
+.rank{width:100%;border-collapse:collapse;font-size:12.5px}
+.rank td{padding:3px 6px 3px 0;border-bottom:1px solid var(--rule)}
+.rank td.v{text-align:right;color:var(--ink);width:1%;white-space:nowrap}
+.rank .bar{width:52%}
+.rank .bar span{display:block;height:9px;border-radius:2px}
+.rank tr.hl td{background:var(--panel-2)}
+
+/* ---- tooltip ---- */
+.tip{position:fixed;pointer-events:none;z-index:50;background:var(--panel);color:var(--ink);
+  border:1px solid var(--rule-2);border-radius:3px;padding:8px 10px;font-size:12.5px;
+  box-shadow:var(--shadow);opacity:0;transition:opacity .1s;max-width:250px}
+.tip.on{opacity:1}
+.tip b{font-weight:600}
+.tip .r{display:flex;justify-content:space-between;gap:14px}
+
+/* ---- notes ---- */
+.notes{columns:2;column-gap:36px;font-size:13.5px;color:var(--ink-2)}
+@media(max-width:700px){.notes{columns:1}}
+.notes p{margin:0 0 13px;break-inside:avoid}
+.notes b{color:var(--ink);font-weight:600}
+details{margin-top:14px;border-top:1px solid var(--rule);padding-top:12px}
+summary{cursor:pointer;font-size:12.5px;color:var(--ink-2);font-weight:500}
+summary:focus-visible{outline:2px solid var(--s1);outline-offset:2px}
+.dtable{width:100%;border-collapse:collapse;font-size:12px;margin-top:12px}
+.dtable th,.dtable td{padding:4px 8px;border-bottom:1px solid var(--rule);text-align:right}
+.dtable th:first-child,.dtable td:first-child{text-align:left}
+.dtable th{color:var(--ink-3);font-weight:500;font-size:11px;letter-spacing:.04em;text-transform:uppercase}
+/* ---- index weights ---- */
+.weights{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px 26px}
+.wrow{display:flex;flex-direction:column;gap:5px;font-size:12.5px;color:var(--ink-2)}
+.wtop{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.wtop label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wrow input[type=range]{width:100%;accent-color:var(--s1)}
+.wv{color:var(--ink);flex:none}
+/* ---- language toggle ---- */
+.langbar{display:flex;justify-content:flex-end;padding-top:20px}
+.lang{display:inline-flex;border:1px solid var(--rule-2);border-radius:3px;overflow:hidden;
+  background:var(--panel)}
+.lang button{font:inherit;font-size:11.5px;letter-spacing:.08em;padding:5px 12px;border:0;
+  background:transparent;color:var(--ink-2);cursor:pointer;
+  font-family:"IBM Plex Mono",monospace}
+.lang button+button{border-left:1px solid var(--rule-2)}
+.lang button[aria-pressed="true"]{background:var(--ink);color:var(--ground)}
+.lang button:focus-visible{outline:2px solid var(--s1);outline-offset:-2px}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ---- Scala.js app additions ---- */
+.chart{width:100%}
+.figcap{font-size:12.5px;color:var(--ink-3);margin:12px 0 0;max-width:70ch}
+#boot{display:none;margin:40px 0;padding:14px 16px;border:1px solid var(--rule-2);
+  border-radius:3px;background:var(--panel);color:var(--ink-2);font-size:13.5px}
+
+/* ---- footer, matching oluies.github.io/elmix ---- */
+footer{margin-top:56px;padding-top:12px;border-top:1px solid var(--rule);
+  font-size:13px;color:var(--ink-3)}
+footer a{color:var(--s1)}
+</style>
+</head>
+<body>
+<div id="boot">Laddar…</div>
+<div id="app"></div>
+
+<!-- ECharts arrives as a global; the loader publishes window.SkogDb. Both must
+     be in place before the Scala.js bundle runs, so app.js is loaded last. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/6.1.0/echarts.min.js"></script>
+<script type="module" src="js/duckdb-loader.js"></script>
+<script defer src="js/app.js"></script>
+</body>
+</html>

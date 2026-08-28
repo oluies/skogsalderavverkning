@@ -1,59 +1,46 @@
-"""Wrap site/index.html into a standalone HTML document in dist/.
+"""Assemble dist/ for GitHub Pages.
 
-site/index.html is authored as an Artifact *fragment*: the Artifact host supplies
-the <!doctype>, <html>, <head> and <body> at publish time, so the file starts
-straight at <title>. Served raw by GitHub Pages that would render in quirks
-mode, so this step adds the document shell Pages needs, without touching the
-source the Artifact publish path depends on.
+The deployed app is the Scala.js one: site/shell.html is already a complete
+document, so this step copies it in as index.html together with the compiled
+bundle, the DuckDB-WASM loader and the parquet data.
+
+The Scala.js bundle must be built first:
+
+    cd frontend && scala-cli --power package . -o ../site/js/app.js --js -f --js-mode release
 """
-import os, re, shutil
+import os, shutil, sys
 
-SRC = "site/index.html"
 OUT = "dist"
+REQUIRED = [
+    ("site/shell.html", "index.html"),
+    ("site/js/app.js", "js/app.js"),
+    ("site/js/duckdb-loader.js", "js/duckdb-loader.js"),
+]
 
-DESCRIPTION = ("How Sweden's average age at final felling has changed by region, "
-               "against site productivity, storms, tree species and climate. "
-               "Built from SLU Riksskogstaxeringen and SMHI open data.")
+missing = [src for src, _ in REQUIRED if not os.path.exists(src)]
+if missing:
+    sys.exit("missing build inputs: " + ", ".join(missing) +
+             "\nBuild the Scala.js bundle first (see this file's docstring).")
 
-fragment = open(SRC, encoding="utf-8").read()
-
-m = re.search(r"<title>(.*?)</title>", fragment, re.S)
-title = m.group(1).strip() if m else "Sweden's Felling Age"
-# the shell carries the title; drop the fragment's own tag so it appears once
-fragment = re.sub(r"<title>.*?</title>\s*", "", fragment, count=1, flags=re.S)
-
-# The fragment opens with the font <link>s and the <style> block. Those belong
-# in <head>: left in <body> they still apply, but only after the parser has
-# already painted, which shows as a flash of unstyled content.
-head_extra = ""
-while True:
-    m = re.match(r"\s*(<link\b[^>]*>|<style\b.*?</style>)\s*", fragment, re.S)
-    if not m:
-        break
-    head_extra += m.group(1) + "\n"
-    fragment = fragment[m.end():]
-
-doc = f"""<!doctype html>
-<html lang="sv">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="{DESCRIPTION}">
-<meta name="color-scheme" content="light dark">
-<meta property="og:title" content="{title}">
-<meta property="og:description" content="{DESCRIPTION}">
-<meta property="og:type" content="website">
-<title>{title}</title>
-{head_extra}</head>
-<body>
-{fragment}
-</body>
-</html>
-"""
-
+if os.path.isdir(OUT):
+    shutil.rmtree(OUT)
 os.makedirs(OUT, exist_ok=True)
-with open(f"{OUT}/index.html", "w", encoding="utf-8") as fh:
-    fh.write(doc)
+
+for src, dest in REQUIRED:
+    target = os.path.join(OUT, dest)
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    shutil.copy2(src, target)
+    print(f"  {src} -> {target} ({os.path.getsize(target):,} bytes)")
+
+shutil.copytree("site/data", os.path.join(OUT, "data"))
+n = len(os.listdir(os.path.join(OUT, "data")))
+print(f"  site/data -> {OUT}/data ({n} files)")
+
 # Pages would otherwise run the output through Jekyll
-open(f"{OUT}/.nojekyll", "w").close()
-print(f"wrote {OUT}/index.html ({len(doc)} bytes), title={title!r}")
+open(os.path.join(OUT, ".nojekyll"), "w").close()
+
+total = sum(
+    os.path.getsize(os.path.join(root, f))
+    for root, _, files in os.walk(OUT) for f in files
+)
+print(f"dist total: {total:,} bytes")

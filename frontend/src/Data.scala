@@ -1,0 +1,246 @@
+package skog
+
+import scala.scalajs.js
+import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
+
+/** A point in a time series. */
+final case class Pt(x: Double, y: Double)
+
+/** One named series ready for ECharts. */
+final case class Series(name: String, color: String, data: Vector[Pt])
+
+final case class County(name: String, landsdel: String, geo: js.Dynamic)
+
+final case class Driver(
+    area: String,
+    landsdel: String,
+    dBonitetPct: Option[Double],
+    dTempC: Option[Double],
+    dPrecipPct: Option[Double],
+    dSnowDays: Option[Double],
+    contortaPct: Option[Double]
+)
+
+object Decode:
+  def opt(d: js.Dynamic, field: String): Option[Double] =
+    val v = d.selectDynamic(field)
+    if js.isUndefined(v) || v == null then None
+    else
+      // Arrow hands numbers back as Double, but a value that arrived via JSON
+      // or as a BigInt-turned-string still needs coercing.
+      val n = js.Dynamic.global.Number(v).asInstanceOf[Double]
+      if n.isNaN then None else Some(n)
+
+  def str(d: js.Dynamic, field: String): String =
+    val v = d.selectDynamic(field)
+    if js.isUndefined(v) || v == null then "" else v.toString
+
+  def num(d: js.Dynamic, field: String): Double = opt(d, field).getOrElse(Double.NaN)
+
+/** All queries the page runs. Keeping them here rather than inline in the view
+  * makes the SQL surface reviewable in one place, and keeps the shaping in
+  * DuckDB where it belongs instead of in JavaScript loops.
+  */
+object Queries:
+
+  /** year -> value, for one filtered series. */
+  private def pairs(rows: js.Array[js.Dynamic], x: String, y: String): Vector[Pt] =
+    rows.toVector
+      .flatMap { r =>
+        (Decode.opt(r, x), Decode.opt(r, y)) match
+          case (Some(a), Some(b)) => Some(Pt(a, b))
+          case _                  => None
+      }
+      .sortBy(_.x)
+
+  /** Group rows into one series per key, in a caller-supplied order. */
+  private def grouped(
+      rows: js.Array[js.Dynamic],
+      keyField: String,
+      x: String,
+      y: String,
+      order: Vector[String],
+      color: String => String
+  ): Vector[Series] =
+    val byKey = rows.toVector.groupBy(r => Decode.str(r, keyField))
+    order.flatMap { k =>
+      byKey.get(k).map { rs =>
+        Series(k, color(k),
+          rs.flatMap { r =>
+            (Decode.opt(r, x), Decode.opt(r, y)) match
+              case (Some(a), Some(b)) => Some(Pt(a, b))
+              case _                  => None
+          }.sortBy(_.x))
+      }
+    }
+
+  private def regionColor(k: String) = Theme.regionColor(k)
+
+  def fellingAge(basis: String): Future[Vector[Series]] =
+    SkogDb.query(
+      s"""SELECT year, region, age_years
+          FROM felling_age
+          WHERE lsa_basis = '$basis' AND region <> 'Hela landet'
+          ORDER BY region, year"""
+    ).map(grouped(_, "region", "year", "age_years", Theme.regions, regionColor))
+
+  def fellingAgeTable: Future[Vector[(Double, Map[String, Double])]] =
+    SkogDb.query(
+      """SELECT year, region, age_years FROM felling_age
+         WHERE lsa_basis = 'excl' ORDER BY year"""
+    ).map { rows =>
+      rows.toVector
+        .groupBy(r => Decode.num(r, "year"))
+        .toVector.sortBy(_._1)
+        .map { case (y, rs) =>
+          y -> rs.map(r => Decode.str(r, "region") -> Decode.num(r, "age_years")).toMap
+        }
+    }
+
+  /** First and last published year per region, for the headline tiles. */
+  def ageChange: Future[Vector[(String, Double, Double)]] =
+    SkogDb.query(
+      """WITH b AS (
+           SELECT region, min(year) AS y0, max(year) AS y1
+           FROM felling_age WHERE lsa_basis = 'excl' GROUP BY region
+         )
+         SELECT b.region,
+                (SELECT age_years FROM felling_age f
+                  WHERE f.region = b.region AND f.year = b.y0 AND f.lsa_basis = 'excl') AS first_v,
+                (SELECT age_years FROM felling_age f
+                  WHERE f.region = b.region AND f.year = b.y1 AND f.lsa_basis = 'excl') AS last_v
+         FROM b WHERE b.region <> 'Hela landet'"""
+    ).map { rows =>
+      val by = rows.toVector.map(r =>
+        Decode.str(r, "region") -> (Decode.num(r, "first_v"), Decode.num(r, "last_v"))).toMap
+      Theme.regions.flatMap(r => by.get(r).map { case (a, b) => (r, a, b) })
+    }
+
+  def siteIndex: Future[Vector[Series]] =
+    SkogDb.query(
+      s"""SELECT year, area, medelbonitet FROM site_index
+          WHERE area IN (${Theme.regions.map(r => s"'$r'").mkString(",")})
+          ORDER BY area, year"""
+    ).map(grouped(_, "area", "year", "medelbonitet", Theme.regions, regionColor))
+
+  /** Ten-year moving mean, computed in SQL rather than in a JS loop. */
+  private def smoothed(table: String, col: String, extraWhere: String): String =
+    s"""SELECT region, year,
+               avg($col) OVER (PARTITION BY region ORDER BY year
+                               ROWS BETWEEN 9 PRECEDING AND CURRENT ROW) AS v,
+               row_number() OVER (PARTITION BY region ORDER BY year) AS rn
+        FROM $table WHERE $extraWhere"""
+
+  def climate(kind: String): Future[Vector[Series]] =
+    val (table, col, where) = kind match
+      case "prec" => ("precip_region", "anom_pct",  "year >= 1900")
+      case "snow" => ("snow_region",   "anom_days", "TRUE")
+      case _      => ("climate_region", "anom_annual", "year >= 1900")
+    SkogDb.query(
+      s"""SELECT region, year, v FROM (${smoothed(table, col, where)})
+          WHERE rn >= 10 ORDER BY region, year"""
+    ).map(grouped(_, "region", "year", "v", Theme.regions, regionColor))
+
+  def naturalLoss: Future[Vector[Series]] =
+    SkogDb.query(
+      """SELECT region, year, mm3sk FROM natural_loss
+         WHERE species = 'Gran' AND region <> 'Hela landet' ORDER BY region, year"""
+    ).map(grouped(_, "region", "year", "mm3sk", Theme.regions, regionColor))
+
+  def damage(kind: String): Future[Vector[Series]] =
+    SkogDb.query(
+      s"""SELECT region, year, share_pct FROM damage
+          WHERE damage_type = '$kind' AND region <> 'Hela landet'
+          ORDER BY region, year"""
+    ).map(grouped(_, "region", "year", "share_pct", Theme.regions, regionColor))
+
+  val harvestTypes = Vector("Slutavverkning", "Gallring", "Övriga huggningsarter")
+
+  def salvage: Future[Vector[Series]] =
+    SkogDb.query(
+      """SELECT region, year, harvest_type, value FROM felling_type
+         WHERE region = 'Götaland' ORDER BY harvest_type, year"""
+    ).map { rows =>
+      grouped(rows, "harvest_type", "year", "value", harvestTypes,
+        k => Theme.slot(harvestTypes.indexOf(k)))
+    }
+
+  val standTypes = Vector("Tallskog", "Granskog", "Barrblandskog", "Lövskog", "Contortaskog")
+
+  def standType: Future[Vector[Series]] =
+    SkogDb.query(
+      """SELECT area, year, stand_type, share_pct FROM stand_type
+         WHERE area = 'Hela landet' ORDER BY stand_type, year"""
+    ).map { rows =>
+      grouped(rows, "stand_type", "year", "share_pct", standTypes,
+        k => Theme.slot(standTypes.indexOf(k)))
+    }
+
+  val species = Vector("Tall", "Gran", "Lövträd")
+
+  def fellingSpecies: Future[Vector[Series]] =
+    SkogDb.query(
+      """SELECT region, year, species, mm3sk FROM felling_species
+         WHERE region = 'Hela landet' ORDER BY species, year"""
+    ).map { rows =>
+      grouped(rows, "species", "year", "mm3sk", species,
+        k => Theme.slot(species.indexOf(k)))
+    }
+
+  def drivers: Future[Vector[Driver]] =
+    SkogDb.query("SELECT * FROM drivers ORDER BY area").map { rows =>
+      rows.toVector.map { r =>
+        Driver(
+          Decode.str(r, "area"),
+          Decode.str(r, "landsdel"),
+          Decode.opt(r, "d_bonitet_pct"),
+          Decode.opt(r, "d_temp_c"),
+          Decode.opt(r, "d_precip_pct"),
+          Decode.opt(r, "d_snow_days"),
+          Decode.opt(r, "contorta_pct")
+        )
+      }
+    }
+
+  /** County values for one map metric, as area -> value. */
+  def mapMetric(metric: String, year: Int): Future[Map[String, Double]] =
+    val sql = metric match
+      case "bonitet" =>
+        s"SELECT area, medelbonitet AS v FROM site_index WHERE year = $year"
+      case "bchange" =>
+        """SELECT a.area, 100*(b.medelbonitet / a.medelbonitet - 1) AS v
+           FROM site_index a JOIN site_index b USING (area)
+           WHERE a.year = 1985 AND b.year = 2023"""
+      case "warming" =>
+        """SELECT area, avg(anom_annual) AS v FROM climate_county
+           WHERE year BETWEEN 2011 AND 2024 GROUP BY area"""
+      case "precip" =>
+        """SELECT area, avg(anom_pct) AS v FROM precip_county
+           WHERE year BETWEEN 2011 AND 2024 GROUP BY area"""
+      case "snow" =>
+        """SELECT area, avg(anom_days) AS v FROM snow_county
+           WHERE year BETWEEN 2011 AND 2024 GROUP BY area"""
+      case "contorta" =>
+        "SELECT area, contorta_pct AS v FROM drivers"
+      case _ =>
+        """SELECT d.area, f.age_years AS v
+           FROM drivers d JOIN felling_age f
+             ON f.region = d.landsdel AND f.year = 2022 AND f.lsa_basis = 'excl'"""
+    SkogDb.query(sql).map { rows =>
+      rows.toVector.flatMap { r =>
+        Decode.opt(r, "v").map(v => Decode.str(r, "area") -> v)
+      }.toMap
+    }
+
+  /** Warming against bonitet change, one row per county, for the scatter. */
+  def scatter: Future[Vector[(String, String, Double, Double)]] =
+    SkogDb.query(
+      """SELECT area, landsdel, d_temp_c, d_bonitet_pct FROM drivers
+         WHERE d_temp_c IS NOT NULL AND d_bonitet_pct IS NOT NULL"""
+    ).map { rows =>
+      rows.toVector.map { r =>
+        (Decode.str(r, "area"), Decode.str(r, "landsdel"),
+         Decode.num(r, "d_temp_c"), Decode.num(r, "d_bonitet_pct"))
+      }
+    }

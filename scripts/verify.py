@@ -1,16 +1,15 @@
-"""Pre-deploy checks for the published page.
+"""Pre-deploy checks.
 
-Guards the three ways this page has actually broken:
-  1. site/payload.json drifting from the copy inlined into site/index.html
-  2. a translation key present in one language but not the other
-  3. the page script failing to parse
-Exits non-zero with a description of the first failure in each category.
+Guards the things that have actually gone wrong in this project:
+  1. a translation key defined in one language but not the other
+     (this shipped once as a literal "undefined" in a tooltip)
+  2. a string key referenced by the app but defined in neither table
+  3. build inputs missing, or a Scala.js bundle that never linked
+  4. a parquet file the DuckDB loader expects but that was never exported
+Exits non-zero listing every failure, not just the first.
 """
-import json, re, shutil, subprocess, sys
+import os, re, sys
 
-PAGE = "site/index.html"
-DATA = "site/payload.json"
-page = open(PAGE, encoding="utf-8").read()
 failures = []
 
 
@@ -20,51 +19,53 @@ def check(name, ok, detail=""):
         failures.append(name)
 
 
-# 1. inlined payload must match payload.json
-m = re.search(r'<script id="payload" type="application/json">(.*?)</script>', page, re.S)
-if not m:
-    check("payload tag present", False, "no <script id=\"payload\"> in the page")
+i18n = open("frontend/src/I18n.scala", encoding="utf-8").read()
+
+
+def keys_in(table):
+    m = re.search(rf"val {table}: Map\[String, String\] = Map\((.*?)\n  \)", i18n, re.S)
+    if not m:
+        return set()
+    return set(re.findall(r'"([A-Za-z0-9_]+)"\s*->', m.group(1)))
+
+
+sv, en = keys_in("sv"), keys_in("en")
+check("sv/en translation keys match", bool(sv) and sv == en,
+      "" if sv == en else f"sv-only={sorted(sv - en)} en-only={sorted(en - sv)}")
+
+# Keys the app asks for by literal name must exist somewhere.
+app_src = "".join(
+    open(os.path.join("frontend/src", f), encoding="utf-8").read()
+    for f in os.listdir("frontend/src") if f.endswith(".scala") and f != "I18n.scala"
+)
+referenced = set(re.findall(r'\bt(?:Now)?\("([A-Za-z0-9_]+)"\)', app_src))
+# keys built by concatenation (map metric captions) are checked separately
+metrics = re.findall(r'"(bonitet|bchange|warming|precip|snow|contorta|age)"\s*->', app_src)
+for v in set(metrics):
+    referenced.add("m" + v.capitalize())
+    referenced.add("cap" + v.capitalize() + ("M" if v in ("precip", "snow") else ""))
+unknown = sorted(referenced - sv)
+check("all referenced string keys defined", not unknown, f"undefined: {unknown}")
+
+# Build inputs
+for path in ("site/shell.html", "site/js/duckdb-loader.js"):
+    check(f"{path} present", os.path.exists(path))
+
+bundle = "site/js/app.js"
+if not os.path.exists(bundle):
+    check("Scala.js bundle built", False, "run scala-cli package first")
 else:
-    inlined = m.group(1).strip()
-    onfile = open(DATA, encoding="utf-8").read().strip()
-    same = json.loads(inlined) == json.loads(onfile)
-    check("payload in sync with payload.json", same,
-          "" if same else "run scripts/inline_payload.py")
+    size = os.path.getsize(bundle)
+    check("Scala.js bundle built", size > 50_000, f"{size:,} bytes")
 
-# 2. the two string tables must define exactly the same keys
-blk = page[page.index("const STR = {"):]
-
-
-def keys_for(tag):
-    i = blk.index(tag + ":{")
-    j = i + len(tag) + 1
-    depth = 0
-    for k in range(j, len(blk)):
-        if blk[k] == "{":
-            depth += 1
-        elif blk[k] == "}":
-            depth -= 1
-            if depth == 0:
-                return set(re.findall(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:", blk[j:k], re.M))
-    raise ValueError(f"unterminated {tag} block")
-
-
-sv, en = keys_for("sv"), keys_for("en")
-check("sv/en translation keys match", sv == en,
-      "" if sv == en else f"sv-only={sorted(sv-en)} en-only={sorted(en-sv)}")
-
-# 3. the page script must parse
-scripts = re.findall(r"<script>\n(.*?)</script>", page, re.S)
-if not scripts:
-    check("page script found", False)
-elif not shutil.which("node"):
-    print("SKIP  page script parses — node not available")
-else:
-    open("/tmp/_verify.js", "w").write(scripts[-1])
-    r = subprocess.run(["node", "--check", "/tmp/_verify.js"],
-                       capture_output=True, text=True)
-    check("page script parses", r.returncode == 0, r.stderr.strip().split("\n")[0]
-          if r.returncode else "")
+# Every table the loader registers needs a parquet file on disk.
+loader = open("site/js/duckdb-loader.js", encoding="utf-8").read()
+m = re.search(r"const TABLES = \[(.*?)\];", loader, re.S)
+tables = re.findall(r'"([a-z_]+)"', m.group(1)) if m else []
+missing = [t for t in tables if not os.path.exists(f"site/data/{t}.parquet")]
+check("parquet files present for every registered table", not missing,
+      f"missing: {missing}" if missing else f"{len(tables)} tables")
+check("county geometry present", os.path.exists("site/data/counties.json"))
 
 print()
 if failures:

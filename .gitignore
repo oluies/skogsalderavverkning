@@ -9,6 +9,11 @@ data/*.duckdb.wal
 site/*.json
 !site/payload.json
 
+# Compiled by scala-cli in CI; not a source artefact
+site/js/app.js
+.scala-build/
+.bsp/
+
 __pycache__/
 *.pyc
 .DS_Store

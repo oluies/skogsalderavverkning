@@ -1,0 +1,35 @@
+name: Scala Steward
+
+# Scala Steward reads the //> using dep directives in frontend/project.scala and
+# opens a PR when Laminar, Scala or Scala.js move. Dependabot does not
+# understand scala-cli directives, so it covers the GitHub Actions only and
+# this covers the Scala side.
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'   # Mondays, 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  scala-steward:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: scala-steward-org/scala-steward-action@v2
+        with:
+          # GITHUB_TOKEN is enough to open PRs. Note that PRs it opens will not
+          # themselves trigger workflows - swap in a PAT or GitHub App token if
+          # you want CI to run on Steward's PRs.
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          author-email: orjan.lundberg@gmail.com
+          author-name: Scala Steward

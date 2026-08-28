@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
     paths:
+      - 'frontend/**'
       - 'site/**'
       - 'scripts/build_pages.py'
       - 'scripts/verify.py'
@@ -26,17 +27,37 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: VirtusLab/scala-cli-setup@v1.16.0
+        with:
+          jvm: temurin:21
+
+      # Coursier's artifact cache dominates a cold build; the key follows the
+      # using-directives, which are what pin the dependency set.
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/coursier
+            ~/.cache/scalacli
+          key: scala-${{ hashFiles('frontend/project.scala') }}
+          restore-keys: scala-
+
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
-      # The page has no dependencies to install: the ETL is Python stdlib only
-      # and the page ships as one static file with no framework and no bundler.
-      # So CI only has to verify what is committed and wrap it for Pages.
-      - name: Verify page
+      - name: Build Scala.js bundle
+        working-directory: frontend
+        run: scala-cli --power package . -o ../site/js/app.js --js -f --js-mode release
+
+      - name: Verify
         run: python3 scripts/verify.py
 
-      - name: Build standalone document
+      - name: Assemble dist
         run: python3 scripts/build_pages.py
 
       - uses: actions/configure-pages@v6
