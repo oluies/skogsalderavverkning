@@ -4,9 +4,15 @@ How the average age at final felling has changed across Sweden, joined against s
 productivity (*bonitet*, the published stand-in for *ståndort*), recorded climate, tree
 species, and storm disturbance.
 
-Everything is built with DuckDB + the `spatial` extension. The map, the county↔region
-mapping and the station→county assignment are all spatial joins done in SQL. The page
-is bilingual (Swedish/English) and self-contained — one HTML file with the data inlined.
+**Stack:** DuckDB (build-time *and* in the browser via DuckDB-WASM), Scala.js + Laminar
+for the reactive UI, and ECharts for the charts and the choropleth. The page is bilingual
+(Swedish/English), defaulting to Swedish.
+
+The build-time half uses DuckDB + `spatial`: the county↔region mapping and the
+station→county assignment are spatial joins in SQL. The browser half ships 14 zstd
+parquet files (192 KB) that DuckDB-WASM registers as views, so every chart is fed by a
+real query rather than a precomputed blob — the ten-year moving means, for instance, are
+a window function, not a JavaScript loop.
 
 ## Sources
 
@@ -33,14 +39,27 @@ rate-limits aggressively — `fetch_slu.py` backs off and retries.
 Runs from a clean checkout; every fetch step is idempotent and skips what it already has.
 
 ```sh
-python3 scripts/fetch_slu.py                    # SLU tables + Natural Earth boundaries
-python3 scripts/fetch_smhi.py                   # temperature
-python3 scripts/fetch_smhi_precip_snow.py       # precipitation + snow
-python3 scripts/flatten_jsonstat.py             # JSON-stat2 -> tidy CSV
-duckdb data/skog.duckdb < scripts/build.sql     # tables + spatial joins
-duckdb data/skog.duckdb < scripts/export.sql    # JSON for the page
-python3 scripts/make_payload.py                 # bundle -> site/payload.json
-python3 scripts/inline_payload.py               # inline it into site/index.html
+# 1. data
+python3 scripts/fetch_slu.py                       # SLU tables + Natural Earth boundaries
+python3 scripts/fetch_smhi.py                      # temperature
+python3 scripts/fetch_smhi_precip_snow.py          # precipitation + snow
+python3 scripts/flatten_jsonstat.py                # JSON-stat2 -> tidy CSV
+duckdb data/skog.duckdb < scripts/build.sql        # tables + spatial joins
+duckdb data/skog.duckdb < scripts/export_parquet.sql   # parquet for the browser
+
+# 2. frontend
+cd frontend && scala-cli --power package . -o ../site/js/app.js --js -f --js-mode release
+
+# 3. assemble + check
+python3 scripts/verify.py
+python3 scripts/build_pages.py                     # -> dist/
+```
+
+Serve `dist/` over HTTP (not `file://` — DuckDB-WASM needs a real origin for its
+worker):
+
+```sh
+cd dist && python3 -m http.server 8899
 ```
 
 `scripts/smhi.py` is the shared SMHI client. Both fetchers exit non-zero if any station
@@ -141,3 +160,36 @@ The source file is deliberately a *fragment* — no `<!doctype>`, `<html>` or
 `<head>` — because the Claude Artifact host supplies those at publish time.
 Served raw, that fragment would render in quirks mode, so the Pages build adds
 the document shell and hoists the font links and stylesheet into `<head>`.
+
+## Notes on the browser stack
+
+**Scala.js links with `moduleKind none`.** ECharts and the DuckDB loader are reached as
+globals rather than imported, so the app needs no bundler and no import map — and that
+lets the Closure Compiler run, which ES-module output would rule out. The dev output is
+2.6 MB across 17 files; the release bundle is a single 432 KB file.
+
+**ECharts needs the map registered before first render.** A choropleth draws a
+*registered* map, so the county polygons are turned into a GeoJSON FeatureCollection and
+registered as `"sweden"` during boot. Skip that and the series has geometry to colour but
+none to draw, and the panel comes up blank.
+
+**DuckDB-WASM costs 32.6 MB on first load** to query 192 KB of parquet. It is cached
+afterwards, and the boot banner covers the wait, but it is a real trade: the data is
+small and the engine is not. It buys genuine SQL in the browser, which is the point of
+the stack. If that ratio ever stops being worth it, the alternative is to precompute the
+chart series at build time and load DuckDB lazily only for ad-hoc queries.
+
+**It cannot run inside the Claude Artifact sandbox.** That CSP blocks the wasm fetch and
+the blob-URL worker. `site/index.html` remains as the no-WASM variant for that target;
+GitHub Pages serves the Scala.js app. Keeping both is a real maintenance cost — if the
+Artifact copy stops earning its keep, delete it and let Pages be canonical.
+
+## Dependency updates
+
+- **Dependabot** (`.github/dependabot.yml`) watches the GitHub Actions weekly and groups
+  them into one PR.
+- **Scala Steward** (`.github/workflows/scala-steward.yml`) watches the `//> using dep`
+  directives in `frontend/project.scala`, which Dependabot does not understand.
+
+Scala Steward runs with `GITHUB_TOKEN`, which is enough to open PRs but does not trigger
+workflows on them; swap in a PAT or GitHub App token if you want CI to run on its PRs.
