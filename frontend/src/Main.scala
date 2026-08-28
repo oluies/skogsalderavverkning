@@ -21,6 +21,7 @@ object App:
   private val weights  = Var(Map("bonitet" -> 1.0, "temp" -> 1.0, "precip" -> 1.0, "snow" -> 0.0))
   private val drivers  = Var(Vector.empty[Driver])
   private val themeTick = Var(0)   // bumped on theme change to force re-render
+  private val nStations = Var("—")
 
   private def initialLang: String =
     val stored =
@@ -179,7 +180,8 @@ object App:
         p(cls := "standfirst", child.text <-- t("standfirst")),
         div(cls := "src",
           Vector("srcAge", "srcBon", "srcClim", "srcGeo").map { k =>
-            span(child.text <-- t(k).map(_.replace("{n}", "946")))
+            span(child.text <-- t(k).combineWith(nStations.signal).map(
+              (s, n) => s.replace("{n}", n)))
           }
         )
       ),
@@ -253,7 +255,7 @@ object App:
             mapView.signal.combineWith(mapYear.signal).combineWith(themeTick.signal).mapTo(()),
             () =>
               val v = mapView.now()
-              Queries.mapMetric(v, mapYear.now()).map { vals =>
+              Queries.mapMetric(v, mapYear.now()).map { (vals, counts) =>
                 val (unitKey, dec, div_) = v match
                   case "bonitet"  => ("unitBon", 1, false)
                   case "bchange"  => ("unitPct", 1, true)
@@ -262,7 +264,8 @@ object App:
                   case "snow"     => ("unitDays", 1, true)
                   case "contorta" => ("unitShare", 1, false)
                   case _          => ("unitYears", 0, false)
-                Charts.choropleth(vals, tNow("m" + v.capitalize), tNow(unitKey), dec, div_)
+                Charts.choropleth(vals, tNow("m" + v.capitalize), tNow(unitKey), dec, div_,
+                                  counts, tNow("tipStations"))
               }
           ),
           caption(lang.signal.combineWith(mapView.signal).map { (_, v) =>
@@ -352,9 +355,9 @@ object App:
       sectionTag(
         div(cls := "shead", div(h2(child.text <-- t("s9h")))),
         div(cls := "panel notes",
-          children <-- lang.signal.map { l =>
+          children <-- lang.signal.combineWith(nStations.signal).map { (l, _) =>
             I18n.notes(l).map { case (head, body) =>
-              p(b(head), " ", body)
+              p(b(head), " ", body.replace("{n}", nStations.now()))
             }.toList
           }
         )
@@ -436,6 +439,9 @@ object App:
     dom.document.documentElement.setAttribute("lang", lang.now())
     val mount = dom.document.getElementById("app")
     render(mount, apply())
+    Queries.meta.foreach { m =>
+      m.get("stations_joined").foreach(v => nStations.set(v.toInt.toString))
+    }
     Queries.drivers.onComplete {
       case Success(d) => drivers.set(d)
       case Failure(e) => dom.console.error(s"drivers query failed: ${e.getMessage}")

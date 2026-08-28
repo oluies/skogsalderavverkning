@@ -47,13 +47,29 @@ python3 scripts/flatten_jsonstat.py                # JSON-stat2 -> tidy CSV
 duckdb data/skog.duckdb < scripts/build.sql        # tables + spatial joins
 duckdb data/skog.duckdb < scripts/export_parquet.sql   # parquet for the browser
 
-# 2. frontend
-cd frontend && scala-cli --power package . -o ../site/js/app.js --js -f --js-mode release
+# 2. frontend  (subshell, so steps 3+ still run from the repo root)
+(cd frontend && scala-cli --power package . -o ../site/js/app.js --js -f --js-mode release)
 
 # 3. assemble + check
 python3 scripts/verify.py
+python3 -m unittest discover -s tests
 python3 scripts/build_pages.py                     # -> dist/
 ```
+
+### The no-WASM variant
+
+`site/index.html` is the self-contained page kept for the Claude Artifact
+sandbox, which cannot run DuckDB-WASM. It is *not* rebuilt by the pipeline
+above; regenerate it after a data refresh with:
+
+```sh
+duckdb data/skog.duckdb < scripts/export.sql
+python3 scripts/make_payload.py
+python3 scripts/inline_payload.py
+```
+
+Nothing checks that it stays in step with the parquet, so it drifts silently if
+you skip this. That is the maintenance cost of keeping two frontends.
 
 Serve `dist/` over HTTP (not `file://` — DuckDB-WASM needs a real origin for its
 worker):
@@ -125,8 +141,8 @@ weighting; the index shows where drivers coincide, and establishes no causal cha
 The MIT licence in `LICENSE` covers **the code in this repository only** — the
 scripts, the SQL and the page. It does not relicense the underlying data.
 
-The published page and `site/payload.json` contain figures derived from three
-third-party open datasets, each of which keeps its own terms and needs
+The published page, `site/data/` (the parquet files and `counties.json`) and
+`site/payload.json` contain figures derived from three third-party open datasets, each of which keeps its own terms and needs
 attribution when reused:
 
 - **SLU Skogsstatistik / Riksskogstaxeringen** — Swedish official forest
@@ -144,22 +160,28 @@ are not interchangeable with the publishers' own series.
 
 ## Deployment
 
-`.github/workflows/pages.yml` deploys to GitHub Pages on every push to `main`
-that touches `site/`. CI does not refetch the data: a full refresh pulls roughly
-30 MB from rate-limited APIs and takes several minutes, so the committed
-`site/payload.json` is the deployed artifact. To refresh, re-run the build steps
-above locally and commit the result.
+`.github/workflows/pages.yml` builds and deploys on every push to `main` that
+touches `frontend/`, `site/`, `build_pages.py`, `verify.py` or the workflow
+itself. The same paths on a pull request build and check without deploying, so a
+Dependabot action bump gets CI signal before merge rather than after.
 
-`scripts/verify.py` runs first and fails the build on the three things that have
-actually gone wrong here: `payload.json` drifting from the copy inlined in the
-page, a translation key defined in one language but not the other, and a page
-script that does not parse.
+CI compiles the Scala.js bundle with scala-cli (Coursier cached on
+`frontend/project.scala`), runs `verify.py` and the tests, then assembles
+`dist/` and publishes it. It does **not** refetch the data: a full refresh pulls
+roughly 30 MB from rate-limited APIs, so the committed `site/data/*.parquet` is
+the deployed artifact. To refresh, run the build locally and commit the result.
 
-`scripts/build_pages.py` wraps `site/index.html` into a standalone document.
-The source file is deliberately a *fragment* — no `<!doctype>`, `<html>` or
-`<head>` — because the Claude Artifact host supplies those at publish time.
-Served raw, that fragment would render in quirks mode, so the Pages build adds
-the document shell and hoists the font links and stylesheet into `<head>`.
+`scripts/verify.py` fails the build on:
+
+- a translation key defined in `sv` but not `en`, or the reverse — this once
+  shipped as a literal `undefined` in a tooltip
+- a string key the app references that neither table defines
+- a Scala.js bundle that did not link, or missing build inputs
+- a parquet file missing for any table `duckdb-loader.js` registers
+
+`scripts/build_pages.py` assembles `dist/` from `site/shell.html` (already a
+complete document), the compiled bundle, the loader and `site/data/`.
+
 
 ## Notes on the browser stack
 

@@ -124,22 +124,33 @@ object Queries:
           ORDER BY area, year"""
     ).map(grouped(_, "area", "year", "medelbonitet", Theme.regions, regionColor))
 
-  /** Ten-year moving mean, computed in SQL rather than in a JS loop. */
+  /** Ten-year moving mean over *calendar years*, not over rows.
+    *
+    * ROWS BETWEEN would average the previous nine present rows, and these
+    * series have gaps - a station network that thins out leaves whole years
+    * missing. With ROWS, a point plotted at 1979 could be the mean of ten
+    * observations spanning 1963-1979 while the caption calls it a ten-year
+    * mean. RANGE windows on the year value itself, and the count lets us
+    * refuse to plot a point backed by too few years.
+    */
   private def smoothed(table: String, col: String, extraWhere: String): String =
     s"""SELECT region, year,
-               avg($col) OVER (PARTITION BY region ORDER BY year
-                               ROWS BETWEEN 9 PRECEDING AND CURRENT ROW) AS v,
-               row_number() OVER (PARTITION BY region ORDER BY year) AS rn
-        FROM $table WHERE $extraWhere"""
+               avg($col) OVER w AS v,
+               count($col) OVER w AS n_years
+        FROM $table WHERE $extraWhere
+        WINDOW w AS (PARTITION BY region ORDER BY year
+                     RANGE BETWEEN 9 PRECEDING AND CURRENT ROW)"""
 
   def climate(kind: String): Future[Vector[Series]] =
     val (table, col, where) = kind match
       case "prec" => ("precip_region", "anom_pct",  "year >= 1900")
       case "snow" => ("snow_region",   "anom_days", "TRUE")
       case _      => ("climate_region", "anom_annual", "year >= 1900")
+    // Require most of the decade to be present before drawing a point, so a
+    // sparse stretch is left as a gap rather than smoothed into a trend.
     SkogDb.query(
       s"""SELECT region, year, v FROM (${smoothed(table, col, where)})
-          WHERE rn >= 10 ORDER BY region, year"""
+          WHERE n_years >= 8 ORDER BY region, year"""
     ).map(grouped(_, "region", "year", "v", Theme.regions, regionColor))
 
   def naturalLoss: Future[Vector[Series]] =
@@ -188,6 +199,12 @@ object Queries:
         k => Theme.slot(species.indexOf(k)))
     }
 
+  /** Figures quoted in prose, keyed by name. */
+  def meta: Future[Map[String, Double]] =
+    SkogDb.query("SELECT k, v FROM meta").map { rows =>
+      rows.toVector.flatMap(r => Decode.opt(r, "v").map(v => Decode.str(r, "k") -> v)).toMap
+    }
+
   def drivers: Future[Vector[Driver]] =
     SkogDb.query("SELECT * FROM drivers ORDER BY area").map { rows =>
       rows.toVector.map { r =>
@@ -203,34 +220,44 @@ object Queries:
       }
     }
 
-  /** County values for one map metric, as area -> value. */
-  def mapMetric(metric: String, year: Int): Future[Map[String, Double]] =
+  /** County values for one map metric, plus the station count backing each
+    * where the metric comes from weather stations - a value resting on one
+    * station should not look the same as one resting on forty.
+    */
+  def mapMetric(metric: String, year: Int): Future[(Map[String, Double], Map[String, Double])] =
     val sql = metric match
       case "bonitet" =>
         s"SELECT area, medelbonitet AS v FROM site_index WHERE year = $year"
       case "bchange" =>
-        """SELECT a.area, 100*(b.medelbonitet / a.medelbonitet - 1) AS v
-           FROM site_index a JOIN site_index b USING (area)
-           WHERE a.year = 1985 AND b.year = 2023"""
+        // same definition as the index and the scatter (decadal means), so the
+        // three surfaces do not each label a different quantity "bonitet change"
+        "SELECT area, d_bonitet_pct AS v FROM drivers"
       case "warming" =>
-        """SELECT area, avg(anom_annual) AS v FROM climate_county
+        """SELECT area, avg(anom_annual) AS v, max(n_stations) AS n FROM climate_county
            WHERE year BETWEEN 2011 AND 2024 GROUP BY area"""
       case "precip" =>
-        """SELECT area, avg(anom_pct) AS v FROM precip_county
+        """SELECT area, avg(anom_pct) AS v, max(n_stations) AS n FROM precip_county
            WHERE year BETWEEN 2011 AND 2024 GROUP BY area"""
       case "snow" =>
-        """SELECT area, avg(anom_days) AS v FROM snow_county
+        """SELECT area, avg(anom_days) AS v, max(n_stations) AS n FROM snow_county
            WHERE year BETWEEN 2011 AND 2024 GROUP BY area"""
       case "contorta" =>
         "SELECT area, contorta_pct AS v FROM drivers"
       case _ =>
+        // latest published year rather than a hardcoded one, so the map does
+        // not silently blank when SLU publishes a new figur 4.9
         """SELECT d.area, f.age_years AS v
            FROM drivers d JOIN felling_age f
-             ON f.region = d.landsdel AND f.year = 2022 AND f.lsa_basis = 'excl'"""
+             ON f.region = d.landsdel AND f.lsa_basis = 'excl'
+           WHERE f.year = (SELECT max(year) FROM felling_age)"""
     SkogDb.query(sql).map { rows =>
-      rows.toVector.flatMap { r =>
+      val vs = rows.toVector.flatMap { r =>
         Decode.opt(r, "v").map(v => Decode.str(r, "area") -> v)
       }.toMap
+      val ns = rows.toVector.flatMap { r =>
+        Decode.opt(r, "n").map(n => Decode.str(r, "area") -> n)
+      }.toMap
+      (vs, ns)
     }
 
   /** Warming against bonitet change, one row per county, for the scatter. */

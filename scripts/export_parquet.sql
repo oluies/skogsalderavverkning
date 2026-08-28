@@ -40,6 +40,11 @@ COPY (SELECT year, region, species, mm3sk FROM natural_loss
       WHERE protection LIKE 'Exkl%' AND species <> 'Alla trädslag')
   TO 'site/data/natural_loss.parquet' (FORMAT parquet, COMPRESSION zstd);
 
+-- Figures the page quotes in prose. Exported rather than hardcoded, because
+-- the station count moves whenever the spatial join changes.
+COPY (SELECT 'stations_joined' AS k, count(*)::BIGINT AS v FROM station_county)
+  TO 'site/data/meta.parquet' (FORMAT parquet, COMPRESSION zstd);
+
 -- County geometry stays GeoJSON: ECharts registerMap consumes it directly.
 COPY (SELECT slu_name, landsdel, iso,
              ST_AsGeoJSON(ST_SimplifyPreserveTopology(geom, 0.02)) AS gj

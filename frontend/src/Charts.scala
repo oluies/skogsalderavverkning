@@ -142,7 +142,9 @@ object Charts:
       label: String,
       unit: String,
       decimals: Int,
-      diverging: Boolean
+      diverging: Boolean,
+      counts: Map[String, Double] = Map.empty,
+      countsLabel: String = ""
   ): js.Object =
     val nums = values.values.toVector
     val (lo, hi) =
@@ -163,7 +165,11 @@ object Charts:
         if js.isUndefined(v) || v == null ||
            js.Dynamic.global.Number(v).asInstanceOf[Double].isNaN then "–"
         else js.Dynamic.global.Number(v).applyDynamic("toFixed")(decimals).toString
-      s"<b>${p.name}</b><br>$label: <b>$shown $unit</b>"
+      val coverage = counts.get(p.name.toString) match
+        case Some(n) if countsLabel.nonEmpty =>
+          s"<br><span style='opacity:.7'>$countsLabel: ${n.toInt}</span>"
+        case _ => ""
+      s"<b>${p.name}</b><br>$label: <b>$shown $unit</b>$coverage"
 
     obj(
       "animation" -> false,

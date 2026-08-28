@@ -9,6 +9,16 @@ on:
       - 'scripts/build_pages.py'
       - 'scripts/verify.py'
       - '.github/workflows/pages.yml'
+  # Dependabot's whole output here is PRs editing this workflow. Without a
+  # pull_request trigger the first execution of a bumped action would be the
+  # deploy after merge, so a bad major would break publishing with no signal.
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - 'site/**'
+      - 'scripts/build_pages.py'
+      - 'scripts/verify.py'
+      - '.github/workflows/pages.yml'
   workflow_dispatch:
 
 # Allow one concurrent deployment; don't cancel a run that is mid-deploy.
@@ -60,14 +70,22 @@ jobs:
       - name: Assemble dist
         run: python3 scripts/build_pages.py
 
+      - name: Run tests
+        run: python3 -m unittest discover -s tests -v
+
+      # Publishing steps run only for pushes; a PR proves the build and the
+      # checks pass under the proposed action versions without deploying.
       - uses: actions/configure-pages@v6
+        if: github.event_name == 'push'
 
       - uses: actions/upload-pages-artifact@v5
+        if: github.event_name == 'push'
         with:
           path: dist
 
   deploy:
     needs: build
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

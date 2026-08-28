@@ -35,7 +35,7 @@ object I18n:
     "capFell" -> "Avverkad volym per trädslag och landsdel, milj. m³sk per år.",
     "capPrec" -> "Årsnederbörd i procent av normalperioden, tioåriga glidande medelvärden. Nederbörden har ökat i hela landet, mest i norr.",
     "capPrecipM" -> "Årsnederbörd 2011–2024 i procent av normalperioden 1961–1990.",
-    "capSnow" -> "Dagar med snötäcke december–mars, avvikelse från normalperioden. Fast fönster och krav på fyra kompletta månader, annars mäter man stationens rapporteringsvana i stället för snön. Götaland saknar tillräckligt underlag.",
+    "capSnow" -> "Dagar med snötäcke december–mars, avvikelse från normalperioden. Fast fönster och krav på fyra kompletta månader, annars mäter man stationens rapporteringsvana i stället för snön. Götalands serie tar slut 1998 — därefter finns ingen station kvar i landsdelen med fyra kompletta vintermånader.",
     "capSnowM" -> "Dagar med snötäcke december–mars, 2011–2024 mot normalperioden. Elva län saknar underlag.",
     "capStand" -> "Andel av produktiv skogsmark per beståndstyp, hela landet. Contortaskogen är liten nationellt men koncentrerad: 6,9 procent av Jämtlands skogsmark.",
     "capTemp" -> "Tioåriga glidande medelvärden av årsavvikelsen. Alla fyra landsdelar ligger 1,4–1,7 °C över normalperioden 1961–1990 under 2011–2024.",
@@ -135,7 +135,7 @@ object I18n:
     "capFell" -> "Felled volume by species and region, million m³sk per year.",
     "capPrec" -> "Annual precipitation as a percent of the normal, ten-year moving means. Precipitation has risen across the country, most in the north.",
     "capPrecipM" -> "Annual precipitation over 2011–2024 as a percent of the 1961–1990 normal.",
-    "capSnow" -> "Days with snow cover December–March, against the normal. A fixed window requiring four complete months — otherwise you measure a station's reporting habit rather than the snow. Götaland lacks sufficient coverage.",
+    "capSnow" -> "Days with snow cover December–March, against the normal. A fixed window requiring four complete months — otherwise you measure a station's reporting habit rather than the snow. Götaland's series ends in 1998: after that no station in the region has four complete winter months.",
     "capSnowM" -> "Days with snow cover December–March, 2011–2024 against the normal. Eleven counties lack coverage.",
     "capStand" -> "Share of productive forest land by stand type, whole country. Lodgepole pine is small nationally but concentrated: 6.9% of Jämtland's forest land.",
     "capTemp" -> "Ten-year moving means of the annual anomaly. All four regions run 1.4–1.7 °C above the 1961–1990 normal over 2011–2024.",
@@ -213,7 +213,7 @@ object I18n:
     ("Bonitet är en skattning, inte en mätning.", "Svensk ståndortsbonitering härleder produktionsförmågan ur ståndortsfaktorer — vegetationstyp, markfuktighet, latitud, höjd — och metoden innehåller klimattermer. En stigande bonitet i norr är därför delvis en verklig tillväxtsignal och delvis definitionsmässig. Läs den inte som en ren mätning av klimateffekt."),
     ("Femårsmedelvärden.", "Båda SLU-serierna är glidande medelvärden, så förändringar mellan enskilda år är dämpade och intilliggande punkter är inte oberoende. Etiketten anger medelåret."),
     ("Stormarna syns — men inte i åldern.", "Gudrun och Per syns tydligt i naturlig avgång och i skadad areal, men stormvirket bokfördes som övriga huggningsarter. Slutavverkningens volym per hektar rörde sig inte. Nedgången i norr har därför andra orsaker: åldersstrukturen från 1900-talets föryngringar, ägarstruktur, virkespriser."),
-    ("Klimatunderlaget är ojämnt.", "Avvikelserna kommer från 946 SMHI-stationer som kopplats geografiskt till län. Stationer som ligger på kustlinjen eller på öar som gränsdatan generaliserar bort knyts till närmaste län inom cirka 11 km; 29 stationer längre ut till havs lämnas medvetet okopplade. Temperatur och nederbörd täcker alla 21 län, men snötäcket saknas i elva — där krävs en station med fyra kompletta vintermånader både under normalperioden och i dag."),
+    ("Klimatunderlaget är ojämnt.", "Avvikelserna kommer från {n} SMHI-stationer som kopplats geografiskt till län. Stationer som ligger på kustlinjen eller på öar som gränsdatan generaliserar bort knyts till närmaste län inom cirka 11 km; 29 stationer längre ut till havs lämnas medvetet okopplade. Temperatur och nederbörd täcker alla 21 län, men snötäcket saknas i elva — där krävs en station med fyra kompletta vintermånader både under normalperioden och i dag."),
     ("Indexet är en fråga, inte ett svar.", "Vikterna är ställbara just därför att det inte finns någon objektivt riktig sammanvägning. Indexet visar var drivkrafterna sammanfaller — det bevisar ingen orsakskedja.")
   )
 
@@ -222,7 +222,7 @@ object I18n:
     ("Bonitet is an estimate, not a measurement.", "Swedish ståndortsbonitering derives site productivity from site factors — vegetation type, soil moisture, latitude, altitude — and the method embeds climate terms. So a rising bonitet in the north is partly a real growth signal and partly definitional. Do not read it as a clean measurement of climate impact."),
     ("Five-year means.", "Both SLU series are moving averages, so year-to-year moves are damped and adjacent points are not independent. The label is the mean year."),
     ("The storms show up — but not in the age.", "Gudrun and Per are plainly visible in natural losses and damaged area, but the storm timber was booked as other harvest types. Final felling's volume per hectare did not move. The northern decline therefore has other causes: age structure inherited from 20th-century regeneration, ownership, timber prices."),
-    ("Climate coverage is uneven.", "Anomalies come from 946 SMHI stations spatially joined to counties. Stations sitting on the coastline, or on islands the boundary data generalises away, are snapped to the nearest county within about 11 km; 29 further offshore are deliberately left unassigned. Temperature and precipitation cover all 21 counties, but snow cover is missing in eleven — it needs a station with four complete winter months in both the baseline and the present."),
+    ("Climate coverage is uneven.", "Anomalies come from {n} SMHI stations spatially joined to counties. Stations sitting on the coastline, or on islands the boundary data generalises away, are snapped to the nearest county within about 11 km; 29 further offshore are deliberately left unassigned. Temperature and precipitation cover all 21 counties, but snow cover is missing in eleven — it needs a station with four complete winter months in both the baseline and the present."),
     ("The index is a question, not an answer.", "The weights are adjustable precisely because there is no objectively correct way to combine these. The index shows where drivers coincide — it establishes no causal chain.")
   )
 

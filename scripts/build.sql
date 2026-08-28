@@ -2,6 +2,10 @@
 -- skogsalderavverkning: build the analysis database
 --   sources: SLU Skogsstatistik (PxWeb), Natural Earth admin-1, SMHI metobs
 -- ---------------------------------------------------------------------------
+-- Stop on the first error: the guards below are only useful if they halt the
+-- build rather than scrolling past in a long log.
+.bail on
+
 INSTALL spatial; LOAD spatial;
 
 -- === 1. Felling age (SLU figur 4.9) ========================================
@@ -88,11 +92,9 @@ FROM county_map m JOIN county_geo g USING (ne_name);
 -- Natural Earth release renames a county it would vanish from the map, the
 -- spatial join and the scatter with no error, so fail loudly instead.
 CREATE OR REPLACE TEMP TABLE _county_check AS
-SELECT count(*) AS n,
-       list(slu_name) FILTER (ne_name NOT IN (SELECT ne_name FROM county_geo)) AS unmatched
+SELECT list(slu_name) FILTER (ne_name NOT IN (SELECT ne_name FROM county_geo)) AS unmatched
 FROM county_map;
-SELECT CASE WHEN (SELECT n FROM _county_check) = 21
-              AND (SELECT count(*) FROM counties) = 21
+SELECT CASE WHEN (SELECT count(*) FROM counties) = 21
             THEN 'counties OK: 21'
             ELSE error('county_map/Natural Earth join broke; unmatched: '
                        || coalesce((SELECT unmatched::VARCHAR FROM _county_check), 'none'))
@@ -111,22 +113,35 @@ WHERE lat IS NOT NULL AND lon IS NOT NULL;
 
 -- A station either falls inside a county, or - for the many that sit right on
 -- the coastline or on an island the boundary data generalises away - is snapped
--- to the nearest county within ~11 km. Stations further out are genuinely
+-- to the nearest county within 11 km. Stations further out are genuinely
 -- offshore (sea and lighthouse stations) and are deliberately left unassigned
 -- rather than attributed to a county's land climate.
-CREATE OR REPLACE MACRO snap_tolerance() AS 0.1;
+--
+-- Distances are measured in SWEREF99 TM, not in degrees. A degree of longitude
+-- is about half a degree of latitude at these latitudes (0.1 deg is 11.1 km
+-- north-south but 5.7 km east-west at 59N, less further north), so a degree
+-- threshold is an ellipse rather than a circle - and, worse, ranking candidate
+-- counties by degree distance can pick the further one for a station sitting
+-- between two. always_xy is required: EPSG:4326 is officially lat/lon, and
+-- without it the coordinates come through transposed.
+CREATE OR REPLACE MACRO snap_metres() AS 11000;
+CREATE OR REPLACE MACRO to_sweref(g) AS ST_Transform(g, 'EPSG:4326', 'EPSG:3006', true);
+
+CREATE OR REPLACE TABLE counties_proj AS
+SELECT slu_name, landsdel, to_sweref(geom) AS geom FROM counties;
 
 CREATE OR REPLACE TABLE station_county AS
 WITH inside AS (
+  -- containment is topological, so it is unaffected by the projection
   SELECT s.station_id, s.name, s.lat, s.lon, c.slu_name, c.landsdel
   FROM stations s JOIN counties c ON ST_Within(s.geom, c.geom)
 ), coastal AS (
   SELECT s.station_id, s.name, s.lat, s.lon,
          c.slu_name, c.landsdel,
          row_number() OVER (PARTITION BY s.station_id
-                            ORDER BY ST_Distance(s.geom, c.geom)) AS rk
-  FROM stations s JOIN counties c
-    ON ST_DWithin(s.geom, c.geom, snap_tolerance())
+                            ORDER BY ST_Distance(to_sweref(s.geom), c.geom)) AS rk
+  FROM stations s JOIN counties_proj c
+    ON ST_DWithin(to_sweref(s.geom), c.geom, snap_metres())
   WHERE s.station_id NOT IN (SELECT station_id FROM inside)
 )
 SELECT station_id, name, lat, lon, slu_name, landsdel FROM inside
@@ -207,9 +222,9 @@ WITH inside AS (
 ), coastal AS (
   SELECT s.station_id, s.name, c.slu_name, c.landsdel,
          row_number() OVER (PARTITION BY s.station_id
-                            ORDER BY ST_Distance(s.geom, c.geom)) AS rk
-  FROM stations_all s JOIN counties c
-    ON ST_DWithin(s.geom, c.geom, snap_tolerance())
+                            ORDER BY ST_Distance(to_sweref(s.geom), c.geom)) AS rk
+  FROM stations_all s JOIN counties_proj c
+    ON ST_DWithin(to_sweref(s.geom), c.geom, snap_metres())
   WHERE s.station_id NOT IN (SELECT station_id FROM inside)
 )
 SELECT station_id, name, slu_name, landsdel FROM inside
@@ -237,7 +252,7 @@ FROM precip_year y JOIN precip_norm n USING (station_id);
 CREATE OR REPLACE TABLE precip_county AS
 SELECT sc.slu_name AS area, a.year, round(avg(a.anom_pct),2) AS anom_pct, count(*) AS n_stations
 FROM precip_anom a JOIN station_county_all sc USING (station_id)
-GROUP BY 1,2 HAVING count(*) >= 1;
+GROUP BY 1,2;
 
 CREATE OR REPLACE TABLE precip_region AS
 SELECT sc.landsdel AS region, a.year, round(avg(a.anom_pct),2) AS anom_pct, count(*) AS n_stations
@@ -280,7 +295,7 @@ SELECT sc.slu_name AS area, a.year,
        round(avg(a.anom_depth),3) AS anom_depth,
        count(*) AS n_stations
 FROM snow_anom a JOIN station_county_all sc USING (station_id)
-GROUP BY 1,2 HAVING count(*) >= 1;
+GROUP BY 1,2;
 
 CREATE OR REPLACE TABLE snow_region AS
 SELECT sc.landsdel AS region, a.year,

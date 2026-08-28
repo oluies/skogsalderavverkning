@@ -8,7 +8,8 @@ import csv, json, sys
 from itertools import product
 
 def flatten(path, out):
-    d = json.load(open(path))
+    with open(path, encoding="utf-8") as fh:
+        d = json.load(fh)
     dims = d["id"]
     sizes = d["size"]
     labels = []

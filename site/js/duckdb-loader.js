@@ -5,8 +5,9 @@
 // promise on a global.
 //
 // Note this cannot work inside a Claude Artifact - that sandbox's CSP blocks
-// the wasm/worker fetches. `SkogDb.ready` rejects there, and the app falls back
-// to its embedded JSON. On GitHub Pages it runs for real.
+// the wasm/worker fetches. There is no fallback: `SkogDb.ready` rejects and
+// Boot.scala reports the failure in the page instead of rendering. The no-WASM
+// variant for that target is site/index.html. On GitHub Pages this runs for real.
 const DUCKDB_VERSION = "1.32.0";
 const CDN = `https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@${DUCKDB_VERSION}`;
 
@@ -15,7 +16,7 @@ const TABLES = [
   "felling_age", "site_index", "climate_county", "climate_region",
   "precip_county", "precip_region", "snow_county", "snow_region",
   "drivers", "stand_type", "felling_species", "felling_type",
-  "damage", "natural_loss",
+  "damage", "natural_loss", "meta",
 ];
 
 async function boot() {

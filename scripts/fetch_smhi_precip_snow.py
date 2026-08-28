@@ -1,5 +1,9 @@
 """Fetch SMHI monthly precipitation (parameter 23) and daily snow depth (param 8).
 
+Also writes the union station list that build.sql spatially joins against: the
+three parameters have different station networks, so neither fetcher's own list
+covers the others.
+
 Snow depth is daily over ~1900 stations, so it is aggregated per station and
 month here rather than written out raw. Per month rather than per season,
 because "days with snow cover" over a whole season is biased by how long each
@@ -17,6 +21,31 @@ import smhi
 
 OUT = "data/raw"
 failures = []
+
+
+def stations_union():
+    """Union of the station lists for the parameters this project reads.
+
+    build.sql joins every station to a county through this one file. Each
+    parameter has its own network - temperature 975 stations, precipitation
+    2169, snow 1897 - so a per-parameter list would silently drop the others.
+    """
+    rows = {}
+    for param in (22, 23, 8):
+        found = 0
+        for s in smhi.stations(param):
+            if s.get("latitude") is None or s.get("longitude") is None:
+                continue
+            rows.setdefault(s["id"], [s["id"], s["name"], s["latitude"],
+                                      s["longitude"], s.get("height")])
+            found += 1
+        print(f"  param {param}: {found} stations with coordinates", flush=True)
+    path = f"{OUT}/smhi_stations_all.csv"
+    with open(path, "w", newline="") as fh:
+        w = csv.writer(fh)
+        w.writerow(["station_id", "name", "lat", "lon", "height"])
+        w.writerows(rows.values())
+    print(f"STATIONS DONE union={len(rows)} -> {path}", flush=True)
 
 
 def _rows(param, station_id):
@@ -85,6 +114,8 @@ def snow():
 
 if __name__ == "__main__":
     which = sys.argv[1] if len(sys.argv) > 1 else "both"
+    if which in ("both", "stations"):
+        stations_union()
     if which in ("both", "precip"):
         precip()
     if which in ("both", "snow"):
