@@ -1,0 +1,13 @@
+version: 2
+updates:
+  # Keeps the Pages workflow's actions current. The Node 20 deprecation warning
+  # on the first run is exactly what this is here to surface next time.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ["*"]

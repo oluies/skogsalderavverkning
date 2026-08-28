@@ -1,0 +1,15 @@
+pid:15740 2026-08-28T19:42:35.921761 [t1] running server in /Users/oluies/projects/skogsalderavverkning/out/mill-daemon
+pid:15740 2026-08-28T19:42:35.937157 [t1] acceptTimeout=Some(30 minutes)
+pid:15740 2026-08-28T19:42:35.949763 [t1] server file locked
+pid:15740 2026-08-28T19:42:35.971349 [t1] listening on port 50071
+pid:15740 2026-08-28T19:42:36.011263 [t1] handling run for Socket[addr=/127.0.0.1,port=50072,localport=50071]
+pid:15740 2026-08-28T19:42:36.016202 [t30] prepareConnection Socket[addr=/127.0.0.1,port=50072,localport=50071]
+pid:15740 2026-08-28T19:42:36.021301 [t30] 1 active connections
+pid:15740 2026-08-28T19:42:36.027197 [t31] handleConnection: starting RPC server
+pid:15740 2026-08-28T19:42:36.052367 [t31] handleConnection: running RPC server
+pid:15740 2026-08-28T19:42:36.056462 [t31] [MillDaemon-Socket[addr=/127.0.0.1,port=50072,localport=50071]] Initializing Mill RPC server... Waiting for the `initialize` message.
+pid:15740 2026-08-28T19:42:36.096307 [t31] [MillDaemon-Socket[addr=/127.0.0.1,port=50072,localport=50071]] Initialized, waiting for messages.
+pid:15740 2026-08-28T19:42:36.145957 [t31] [MillDaemon-Socket[addr=/127.0.0.1,port=50072,localport=50071]] Transport wire broken.
+pid:15740 2026-08-28T19:42:36.146525 [t30] done=false, idle=true, lastClientAlive=false
+pid:15740 2026-08-28T19:42:36.150944 [t31] handleConnection: RPC server finished normally, exitCode=0
+pid:15740 2026-08-28T19:42:36.151267 [t30] 0 active connections
