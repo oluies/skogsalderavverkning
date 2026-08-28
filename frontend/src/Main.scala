@@ -105,6 +105,16 @@ object App:
 
   private def panel(children: HtmlElement*): HtmlElement = div(cls := "panel", children)
 
+  /** Unit key, decimals and whether the scale diverges, per map metric. */
+  private def metricFormat(v: String): (String, Int, Boolean) = v match
+    case "bonitet"  => ("unitBon", 1, false)
+    case "bchange"  => ("unitPct", 1, true)
+    case "warming"  => ("unitC", 2, true)
+    case "precip"   => ("unitPrec", 1, true)
+    case "snow"     => ("unitDays", 1, true)
+    case "contorta" => ("unitShare", 1, false)
+    case _          => ("unitYears", 0, false)
+
   private def caption(sig: Signal[String]): HtmlElement =
     p(cls := "figcap", child.text <-- sig)
 
@@ -257,22 +267,41 @@ object App:
               span(cls := "yr mono", child.text <-- mapYear.signal.map(_.toString))
             )
           ),
-          asyncChart(620,
-            mapView.signal.combineWith(mapYear.signal).combineWith(themeTick.signal).mapTo(()),
-            () =>
-              val v = mapView.now()
-              Queries.mapMetric(v, mapYear.now()).map { (vals, counts) =>
-                val (unitKey, dec, div_) = v match
-                  case "bonitet"  => ("unitBon", 1, false)
-                  case "bchange"  => ("unitPct", 1, true)
-                  case "warming"  => ("unitC", 2, true)
-                  case "precip"   => ("unitPrec", 1, true)
-                  case "snow"     => ("unitDays", 1, true)
-                  case "contorta" => ("unitShare", 1, false)
-                  case _          => ("unitYears", 0, false)
-                Charts.choropleth(vals, tNow("m" + v.capitalize), tNow(unitKey), dec, div_,
-                                  counts, tNow("tipStations"), tNow("tipNoData"))
-              }
+          div(cls := "maprow",
+            asyncChart(620,
+              mapView.signal.combineWith(mapYear.signal).combineWith(themeTick.signal).mapTo(()),
+              () =>
+                val v = mapView.now()
+                Queries.mapMetric(v, mapYear.now()).map { (vals, counts) =>
+                  val (unitKey, dec, div_) = metricFormat(v)
+                  Charts.choropleth(vals, tNow("m" + v.capitalize), tNow(unitKey), dec, div_,
+                                    counts, tNow("tipStations"), tNow("tipNoData"))
+                }
+            ),
+            // Beside the map: the same values over time where there is a yearly
+            // series, otherwise a ranked list - a heatmap of one column per
+            // county would say nothing the map has not already said.
+            div(
+              asyncChart(620,
+                mapView.signal.combineWith(themeTick.signal).mapTo(()),
+                () =>
+                  val v = mapView.now()
+                  val (unitKey, dec, div_) = metricFormat(v)
+                  Queries.heatmap(v).flatMap {
+                    case Some((areas, years, cells)) =>
+                      Future.successful(Charts.heatmap(areas, years, cells,
+                        tNow("m" + v.capitalize), tNow(unitKey), dec, div_))
+                    case None =>
+                      Queries.mapMetric(v, mapYear.now()).map { (vals, _) =>
+                        Charts.ranked(vals, tNow("m" + v.capitalize), tNow(unitKey), dec, div_)
+                      }
+                  }
+              ),
+              p(cls := "figcap",
+                child.text <-- lang.signal.combineWith(mapView.signal).map { (_, v) =>
+                  if Queries.hasYearlySeries(v) then tNow("capHeatmap") else tNow("capRanked")
+                })
+            )
           ),
           caption(lang.signal.combineWith(mapView.signal).map { (_, v) =>
             tNow("cap" + v.capitalize + (if v == "precip" || v == "snow" then "M" else ""))
@@ -288,12 +317,23 @@ object App:
             weightSlider("precip", "wPrecip"),
             weightSlider("snow", "wSnow")
           ),
-          chart(620,
-            drivers.signal.combineWith(weights.signal).combineWith(lang.signal)
-              .combineWith(themeTick.signal).map { (ds, w, _, _) =>
-                Charts.choropleth(indexValues(ds, w), tNow("tipIndex"), "", 2, true,
-                                  noDataLabel = tNow("tipNoData"))
-              }),
+          div(cls := "maprow",
+            chart(620,
+              drivers.signal.combineWith(weights.signal).combineWith(lang.signal)
+                .combineWith(themeTick.signal).map { (ds, w, _, _) =>
+                  Charts.choropleth(indexValues(ds, w), tNow("tipIndex"), "", 2, true,
+                                    noDataLabel = tNow("tipNoData"))
+                }),
+            div(
+              div(cls := "eyebrow", styleAttr := "margin-bottom:10px",
+                child.text <-- t("idxRank")),
+              chart(560,
+                drivers.signal.combineWith(weights.signal).combineWith(lang.signal)
+                  .combineWith(themeTick.signal).map { (ds, w, _, _) =>
+                    Charts.ranked(indexValues(ds, w), tNow("tipIndex"), "", 2, true)
+                  })
+            )
+          ),
           caption(t("idxCap").map(stripTags))
         )
       ),

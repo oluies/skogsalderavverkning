@@ -280,3 +280,145 @@ object Charts:
         }
       }.toJSArray
     )
+
+  /** County x year heatmap, shown beside the map.
+    *
+    * The map answers "where, this year"; this answers "where, over time" - the
+    * same values, the same colour scale, one more dimension.
+    */
+  def heatmap(
+      areas: Vector[String],
+      years: Vector[Int],
+      cells: Vector[(Int, Int, Double)],
+      label: String,
+      unit: String,
+      decimals: Int,
+      diverging: Boolean
+  ): js.Object =
+    val vals = cells.map(_._3)
+    val (lo, hi) =
+      if vals.isEmpty then (0.0, 1.0)
+      else if diverging then
+        val m = vals.map(math.abs).max
+        (-m, m)
+      else (vals.min, vals.max)
+    val ramp =
+      if diverging then Vector(-1.0, -0.5, 0.0, 0.5, 1.0).map(t => Theme.diverging(t))
+      else Theme.seq
+
+    val tip: js.Function1[js.Dynamic, String] = (p: js.Dynamic) =>
+      val d = p.value.asInstanceOf[js.Array[js.Any]]
+      val yr = years(js.Dynamic.global.Number(d(0)).asInstanceOf[Double].toInt)
+      val ar = areas(js.Dynamic.global.Number(d(1)).asInstanceOf[Double].toInt)
+      val v = fixed(js.Dynamic.global.Number(d(2)).asInstanceOf[Double], decimals)
+      s"<b>$ar</b><br>$yr<br>$label: <b>$v $unit</b>"
+
+    obj(
+      "animation" -> false,
+      "backgroundColor" -> "transparent",
+      "grid" -> obj("left" -> 116, "right" -> 16, "top" -> 10, "bottom" -> 52),
+      "tooltip" -> obj(
+        "trigger" -> "item",
+        "backgroundColor" -> Theme.panel,
+        "borderColor" -> Theme.rule2, "borderWidth" -> 1,
+        "textStyle" -> obj("color" -> Theme.ink, "fontSize" -> 12.5),
+        "formatter" -> tip
+      ),
+      "xAxis" -> obj(
+        "type" -> "category",
+        "data" -> years.map(y => y.toString: js.Any).toJSArray,
+        "axisLabel" -> obj("color" -> Theme.ink3, "fontSize" -> 10,
+                           "fontFamily" -> "IBM Plex Mono, monospace", "interval" -> "auto"),
+        "axisLine" -> obj("lineStyle" -> obj("color" -> Theme.rule2)),
+        "axisTick" -> obj("show" -> false),
+        "splitArea" -> obj("show" -> false)
+      ),
+      "yAxis" -> obj(
+        "type" -> "category",
+        // north at the top: rows arrive ordered by centroid latitude, and the
+        // category axis draws its first entry at the bottom
+        "data" -> areas.reverse.map(a => (a.replace(" län", "")): js.Any).toJSArray,
+        "axisLabel" -> obj("color" -> Theme.ink2, "fontSize" -> 10.5,
+                           "fontFamily" -> "IBM Plex Sans, sans-serif"),
+        "axisLine" -> obj("show" -> false),
+        "axisTick" -> obj("show" -> false),
+        "splitArea" -> obj("show" -> false)
+      ),
+      "visualMap" -> obj(
+        "type" -> "continuous",
+        "min" -> lo, "max" -> hi,
+        "calculable" -> false, "show" -> false,
+        "inRange" -> obj("color" -> ramp.toJSArray)
+      ),
+      "series" -> js.Array[js.Any](obj(
+        "type" -> "heatmap",
+        "data" -> cells.map { case (x, y, v) =>
+          // y is flipped to match the reversed category axis
+          js.Array[js.Any](x, areas.length - 1 - y, v): js.Any
+        }.toJSArray,
+        "progressive" -> 0,
+        "itemStyle" -> obj("borderColor" -> Theme.panel, "borderWidth" -> 0.5),
+        "emphasis" -> obj("itemStyle" -> obj("borderColor" -> Theme.ink, "borderWidth" -> 1.2))
+      ))
+    )
+
+  /** Ranked horizontal bars, for the metrics that are one number per county. */
+  def ranked(
+      values: Map[String, Double],
+      label: String,
+      unit: String,
+      decimals: Int,
+      diverging: Boolean
+  ): js.Object =
+    val sorted = values.toVector.sortBy(_._2)
+    val nums = sorted.map(_._2)
+    val m = if nums.isEmpty then 1.0 else nums.map(math.abs).max
+    val tip: js.Function1[js.Dynamic, String] = (p: js.Dynamic) =>
+      s"<b>${p.name}</b><br>$label: <b>${fixed(
+        js.Dynamic.global.Number(p.value).asInstanceOf[Double], decimals)} $unit</b>"
+    val barColor: js.Function1[js.Dynamic, String] = (p: js.Dynamic) =>
+      val v = js.Dynamic.global.Number(p.value).asInstanceOf[Double]
+      if diverging then Theme.diverging(v / m)
+      else
+        val seq = Theme.seq
+        val lo = nums.min
+        val hi = nums.max
+        val t = if hi == lo then 0.5 else (v - lo) / (hi - lo)
+        seq(math.max(0, math.min(seq.length - 1, (t * seq.length * 0.999).toInt)))
+
+    val barLabel: js.Function1[js.Dynamic, String] = (p: js.Dynamic) =>
+      fixed(js.Dynamic.global.Number(p.value).asInstanceOf[Double], decimals)
+
+    obj(
+      "animation" -> false,
+      "backgroundColor" -> "transparent",
+      "grid" -> obj("left" -> 116, "right" -> 46, "top" -> 10, "bottom" -> 24),
+      "tooltip" -> obj(
+        "trigger" -> "item",
+        "backgroundColor" -> Theme.panel, "borderColor" -> Theme.rule2, "borderWidth" -> 1,
+        "textStyle" -> obj("color" -> Theme.ink, "fontSize" -> 12.5),
+        "formatter" -> tip
+      ),
+      "xAxis" -> obj("type" -> "value", "show" -> false),
+      "yAxis" -> obj(
+        "type" -> "category",
+        "data" -> sorted.map(t => (t._1.replace(" län", "")): js.Any).toJSArray,
+        "axisLabel" -> obj("color" -> Theme.ink2, "fontSize" -> 10.5,
+                           "fontFamily" -> "IBM Plex Sans, sans-serif"),
+        "axisLine" -> obj("show" -> false),
+        "axisTick" -> obj("show" -> false)
+      ),
+      "series" -> js.Array[js.Any](obj(
+        "type" -> "bar",
+        "barWidth" -> "62%",
+        "itemStyle" -> obj(
+          "borderRadius" -> js.Array(0, 3, 3, 0),
+          "color" -> barColor
+        ),
+        "label" -> obj("show" -> true, "position" -> "right",
+                       "color" -> Theme.ink2, "fontSize" -> 10.5,
+                       "fontFamily" -> "IBM Plex Mono, monospace",
+                       "formatter" -> barLabel),
+        "data" -> sorted.map(_._2).map(v => (v: js.Any)).toJSArray
+      ))
+    )

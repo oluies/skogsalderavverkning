@@ -15,6 +15,7 @@ final case class County(name: String, landsdel: String, geo: js.Dynamic)
 final case class Driver(
     area: String,
     landsdel: String,
+    lat: Option[Double],
     dBonitetPct: Option[Double],
     dTempC: Option[Double],
     dPrecipPct: Option[Double],
@@ -211,6 +212,7 @@ object Queries:
         Driver(
           Decode.str(r, "area"),
           Decode.str(r, "landsdel"),
+          Decode.opt(r, "lat"),
           Decode.opt(r, "d_bonitet_pct"),
           Decode.opt(r, "d_temp_c"),
           Decode.opt(r, "d_precip_pct"),
@@ -261,6 +263,49 @@ object Queries:
       }.toMap
       (vs, ns)
     }
+
+  /** Whether a map metric has a yearly series to draw a heatmap from. */
+  def hasYearlySeries(metric: String): Boolean =
+    Set("bonitet", "warming", "precip", "snow").contains(metric)
+
+  /** County x year values for the heatmap beside the map.
+    *
+    * Only the metrics that actually have a yearly series: the map's other
+    * metrics are a single number per county, where a heatmap would just be a
+    * one-column strip. Rows come back ordered north to south by centroid
+    * latitude, so the gradient reads geographically.
+    */
+  def heatmap(metric: String): Future[Option[(Vector[String], Vector[Int], Vector[(Int, Int, Double)])]] =
+    val src = metric match
+      case "bonitet" => Some(("site_index", "medelbonitet", "area", ""))
+      case "warming" => Some(("climate_county", "anom_annual", "area", "AND year >= 1900"))
+      case "precip"  => Some(("precip_county", "anom_pct", "area", "AND year >= 1900"))
+      case "snow"    => Some(("snow_county", "anom_days", "area", ""))
+      case _         => None
+    src match
+      case None => Future.successful(None)
+      case Some((table, col, areaCol, extra)) =>
+        SkogDb.query(
+          s"""SELECT t.$areaCol AS area, t.year AS year, t.$col AS v, d.lat AS lat
+              FROM $table t JOIN drivers d ON d.area = t.$areaCol
+              WHERE t.$col IS NOT NULL $extra
+              ORDER BY d.lat DESC, t.year"""
+        ).map { rows =>
+          val recs = rows.toVector.flatMap { r =>
+            for
+              v <- Decode.opt(r, "v")
+              y <- Decode.opt(r, "year")
+              lat <- Decode.opt(r, "lat")
+            yield (Decode.str(r, "area"), y.toInt, v, lat)
+          }
+          if recs.isEmpty then None
+          else
+            val areas = recs.map(t => (t._1, t._4)).distinct.sortBy(-_._2).map(_._1)
+            val years = recs.map(_._2).distinct.sorted
+            val ai = areas.zipWithIndex.toMap
+            val yi = years.zipWithIndex.toMap
+            Some((areas, years, recs.map(t => (yi(t._2), ai(t._1), t._3))))
+        }
 
   /** Warming against bonitet change, one row per county, for the scatter. */
   def scatter: Future[Vector[(String, String, Double, Double)]] =
