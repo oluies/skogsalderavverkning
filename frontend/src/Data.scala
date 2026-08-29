@@ -264,9 +264,23 @@ object Queries:
       (vs, ns)
     }
 
+  /** Where each heatmap-capable metric's yearly series comes from:
+    * (table, value column, area column, extra predicate).
+    *
+    * One definition, because the caption text and the choice of chart are
+    * driven by the same question - split across two literals they could
+    * disagree, and the panel would then draw a heatmap under a caption saying
+    * there is no time axis.
+    */
+  private val yearlySources: Map[String, (String, String, String, String)] = Map(
+    "bonitet" -> ("site_index",     "medelbonitet", "area", ""),  // centred per row, see below
+    "warming" -> ("climate_county", "anom_annual",  "area", "AND year >= 1900"),
+    "precip"  -> ("precip_county",  "anom_pct",     "area", "AND year >= 1900"),
+    "snow"    -> ("snow_county",    "anom_days",    "area", "")
+  )
+
   /** Whether a map metric has a yearly series to draw a heatmap from. */
-  def hasYearlySeries(metric: String): Boolean =
-    Set("bonitet", "warming", "precip", "snow").contains(metric)
+  def hasYearlySeries(metric: String): Boolean = yearlySources.contains(metric)
 
   /** County x year values for the heatmap beside the map.
     *
@@ -276,17 +290,25 @@ object Queries:
     * latitude, so the gradient reads geographically.
     */
   def heatmap(metric: String): Future[Option[(Vector[String], Vector[Int], Vector[(Int, Int, Double)])]] =
-    val src = metric match
-      case "bonitet" => Some(("site_index", "medelbonitet", "area", ""))
-      case "warming" => Some(("climate_county", "anom_annual", "area", "AND year >= 1900"))
-      case "precip"  => Some(("precip_county", "anom_pct", "area", "AND year >= 1900"))
-      case "snow"    => Some(("snow_county", "anom_days", "area", ""))
-      case _         => None
-    src match
+    yearlySources.get(metric) match
       case None => Future.successful(None)
       case Some((table, col, areaCol, extra)) =>
+        // Each row is centred on its own county's mean.
+        //
+        // Without this the colour encodes the county's level, which the map
+        // beside it already shows - and it swamps the time signal: counties
+        // differ by 8.4 m3sk of bonitet while the largest change within any
+        // one county over 38 years is 0.7, so a shared absolute scale spends
+        // 92% of its range on the north-south gradient. Centring makes the
+        // heatmap answer the question a time axis is for.
+        //
+        // The climate metrics are already anomalies against a fixed 1961-1990
+        // baseline, but centring them too keeps every row on one diverging
+        // scale and asks the same question of each: how has this county moved
+        // relative to its own normal.
+        val expr = s"t.$col - avg(t.$col) OVER (PARTITION BY t.$areaCol)"
         SkogDb.query(
-          s"""SELECT t.$areaCol AS area, t.year AS year, t.$col AS v, d.lat AS lat
+          s"""SELECT t.$areaCol AS area, t.year AS year, $expr AS v, d.lat AS lat
               FROM $table t JOIN drivers d ON d.area = t.$areaCol
               WHERE t.$col IS NOT NULL $extra
               ORDER BY d.lat DESC, t.year"""

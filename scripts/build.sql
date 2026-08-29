@@ -379,9 +379,11 @@ WITH b AS (
   FROM stand_type WHERE stand_type = 'Contortaskog' GROUP BY 1
 )
 SELECT cm.slu_name AS area, cm.landsdel,
-       -- centroid latitude, so the heatmap can order counties north to south
-       round((SELECT ST_Y(ST_Centroid(c.geom)) FROM counties c
-              WHERE c.slu_name = cm.slu_name), 4) AS lat,
+       -- centroid latitude, so the heatmap can order counties north to south.
+       -- Aliased `g`, not `c`: the contorta CTE below is already `c`, and two
+       -- bindings of one name in the same SELECT list is a trap for the next edit.
+       round((SELECT ST_Y(ST_Centroid(g.geom)) FROM counties g
+              WHERE g.slu_name = cm.slu_name), 4) AS lat,
        round(b.b_early,2) AS bonitet_early, round(b.b_late,2) AS bonitet_late,
        round(100*(b.b_late/b.b_early - 1),2) AS d_bonitet_pct,
        round(t.d_temp,3)   AS d_temp_c,

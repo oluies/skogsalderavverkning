@@ -313,8 +313,10 @@ object App:
                   val (unitKey, dec, div_) = metricFormat(v)
                   Queries.heatmap(v).flatMap {
                     case Some((areas, years, cells)) =>
+                      // always diverging: the cells are deviations from each
+                      // county's own mean, so zero is a real midpoint
                       Future.successful(Charts.heatmap(areas, years, cells,
-                        tNow(metricLabel(v)), tNow(unitKey), dec, div_))
+                        tNow(metricLabel(v)), tNow(unitKey), dec, diverging = true))
                     case None =>
                       Queries.mapMetric(v, mapYear.now()).map { (vals, _) =>
                         Charts.ranked(vals, tNow(metricLabel(v)), tNow(unitKey), dec, div_)

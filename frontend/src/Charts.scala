@@ -310,13 +310,15 @@ object Charts:
       val d = p.value.asInstanceOf[js.Array[js.Any]]
       val yr = years(js.Dynamic.global.Number(d(0)).asInstanceOf[Double].toInt)
       val ar = areas(js.Dynamic.global.Number(d(1)).asInstanceOf[Double].toInt)
+      // areas, the axis data and the cell indices all share one order; the
+      // axis is inverted for display only, so no index arithmetic is needed
       val v = fixed(js.Dynamic.global.Number(d(2)).asInstanceOf[Double], decimals)
       s"<b>$ar</b><br>$yr<br>$label: <b>$v $unit</b>"
 
     obj(
       "animation" -> false,
       "backgroundColor" -> "transparent",
-      "grid" -> obj("left" -> 116, "right" -> 16, "top" -> 10, "bottom" -> 52),
+      "grid" -> obj("left" -> 116, "right" -> 16, "top" -> 10, "bottom" -> 74),
       "tooltip" -> obj(
         "trigger" -> "item",
         "backgroundColor" -> Theme.panel,
@@ -335,26 +337,36 @@ object Charts:
       ),
       "yAxis" -> obj(
         "type" -> "category",
-        // north at the top: rows arrive ordered by centroid latitude, and the
-        // category axis draws its first entry at the bottom
-        "data" -> areas.reverse.map(a => (a.replace(" län", "")): js.Any).toJSArray,
+        // rows arrive ordered north to south; `inverse` puts the first entry at
+        // the top for display without renumbering the cells underneath
+        "data" -> areas.map(a => (a.replace(" län", "")): js.Any).toJSArray,
+        "inverse" -> true,
         "axisLabel" -> obj("color" -> Theme.ink2, "fontSize" -> 10.5,
                            "fontFamily" -> "IBM Plex Sans, sans-serif"),
         "axisLine" -> obj("show" -> false),
         "axisTick" -> obj("show" -> false),
         "splitArea" -> obj("show" -> false)
       ),
+      // The heatmap spans every year while the map beside it shows one year (or
+      // a period mean), so the two ranges genuinely differ - single years swing
+      // wider than a 14-year mean. Rather than let the reader borrow the map's
+      // legend and misread the colours, the heatmap carries its own.
       "visualMap" -> obj(
         "type" -> "continuous",
         "min" -> lo, "max" -> hi,
-        "calculable" -> false, "show" -> false,
+        "calculable" -> false, "show" -> true,
+        "orient" -> "horizontal",
+        "left" -> "center", "bottom" -> 0,
+        "itemWidth" -> 11, "itemHeight" -> 90,
+        "text" -> js.Array(fixed(hi, decimals), fixed(lo, decimals)),
+        "textStyle" -> obj("color" -> Theme.ink3, "fontSize" -> 10.5,
+                           "fontFamily" -> "IBM Plex Mono, monospace"),
         "inRange" -> obj("color" -> ramp.toJSArray)
       ),
       "series" -> js.Array[js.Any](obj(
         "type" -> "heatmap",
         "data" -> cells.map { case (x, y, v) =>
-          // y is flipped to match the reversed category axis
-          js.Array[js.Any](x, areas.length - 1 - y, v): js.Any
+          js.Array[js.Any](x, y, v): js.Any
         }.toJSArray,
         "progressive" -> 0,
         "itemStyle" -> obj("borderColor" -> Theme.panel, "borderWidth" -> 0.5),
