@@ -471,3 +471,61 @@ SELECT "Sortiment" AS assortment,
        CAST(value AS DOUBLE) AS kr_m3fub_2022
 FROM read_csv('data/raw/prices_real_1967_2022.csv', header=true, all_varchar=true)
 WHERE value <> '';
+
+-- ---------------------------------------------------------------------------
+-- One price series 1995-2025, spliced from the two Skogsstyrelsen tables.
+--
+-- They use different regionings: the old table (1995-2021) reports Nord /
+-- Mellan / Syd, the current one (2019-) reports the four landsdelar. The three
+-- overlap years let the mapping be checked rather than assumed:
+--
+--   Nord   vs N+S Norrland   agree within about 2%
+--   Syd    vs Gotaland       agree within about 1.5%
+--   Mellan vs Svealand       old runs about 9% HIGH
+--
+-- So Skogsstyrelsen's Mellan is not Svealand - it reaches further south. Nord
+-- and Syd splice cleanly; Mellan is carried but flagged, and the seam year is
+-- recorded so the page can mark it.
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE TABLE prices_long AS
+WITH old AS (
+  SELECT "Region" AS region3, "Sortiment" AS assortment,
+         CAST("År" AS INT) AS year, CAST(value AS DOUBLE) AS kr
+  FROM read_csv('data/raw/prices_region_1995_2021.csv', header=true, all_varchar=true)
+  WHERE value <> '' AND "Region" <> 'Hela landet'
+), new3 AS (
+  -- fold the landsdelar back to the old three regions
+  SELECT CASE WHEN region IN ('N Norrland','S Norrland') THEN 'Nord'
+              WHEN region = 'Svealand' THEN 'Mellan'
+              WHEN region = 'Götaland' THEN 'Syd' END AS region3,
+         assortment, year, avg(kr_m3fub) AS kr
+  FROM prices_region WHERE region <> 'Hela landet'
+  GROUP BY 1, 2, 3
+)
+SELECT region3, assortment, year, round(kr, 1) AS kr_m3fub, 'Skogsstyrelsen 1995-2021' AS src
+FROM old WHERE year <= 2021
+UNION ALL
+SELECT region3, assortment, year, round(kr, 1), 'Skogsstyrelsen 2019-' 
+FROM new3 WHERE year >= 2022 AND region3 IS NOT NULL;
+
+-- How well the two agree in the overlap, kept so the page can state it rather
+-- than the reader having to trust it.
+CREATE OR REPLACE TABLE prices_splice_check AS
+WITH old AS (
+  SELECT "Region" AS region3, "Sortiment" AS assortment,
+         CAST("År" AS INT) AS year, CAST(value AS DOUBLE) AS kr
+  FROM read_csv('data/raw/prices_region_1995_2021.csv', header=true, all_varchar=true)
+  WHERE value <> '' AND "Region" <> 'Hela landet'
+), new3 AS (
+  SELECT CASE WHEN region IN ('N Norrland','S Norrland') THEN 'Nord'
+              WHEN region = 'Svealand' THEN 'Mellan'
+              WHEN region = 'Götaland' THEN 'Syd' END AS region3,
+         assortment, year, avg(kr_m3fub) AS kr
+  FROM prices_region WHERE region <> 'Hela landet' GROUP BY 1,2,3
+)
+SELECT o.region3,
+       round(avg(100*(n.kr - o.kr)/o.kr), 1) AS pct_diff,
+       count(*) AS n_pairs
+FROM old o JOIN new3 n USING (region3, assortment, year)
+WHERE o.year BETWEEN 2019 AND 2021
+GROUP BY 1 ORDER BY 1;

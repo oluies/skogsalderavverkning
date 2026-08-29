@@ -261,6 +261,22 @@ object Queries:
           ORDER BY region, year"""
     ).map(grouped(_, "region", "year", "kr_m3fub", Theme.regions, regionColor))
 
+  val region3 = Vector("Nord", "Mellan", "Syd")
+
+  /** The two Skogsstyrelsen price tables spliced into one 1995-2025 series.
+    *
+    * Coarser than prices_region on purpose: the old table only ever had three
+    * regions, and pretending it resolves to landsdelar would invent detail.
+    */
+  def pricesLong(assortment: String): Future[Vector[Series]] =
+    SkogDb.query(
+      s"""SELECT region3, year, kr_m3fub FROM prices_long
+          WHERE assortment = '$assortment' ORDER BY region3, year"""
+    ).map { rows =>
+      grouped(rows, "region3", "year", "kr_m3fub", region3,
+        k => Theme.slot(region3.indexOf(k)))
+    }
+
   /** National prices in 2022 money, back to 1967. */
   def pricesReal: Future[Vector[Series]] =
     SkogDb.query(

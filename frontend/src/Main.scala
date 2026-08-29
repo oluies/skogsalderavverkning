@@ -442,10 +442,11 @@ object App:
       ),
 
       section(K.s11h, K.s11p,
-        Some(segmented(prView, Vector("region" -> K.prRegion, "real" -> K.prReal))),
+        Some(segmented(prView, Vector(
+          "region" -> K.prRegion, "long" -> K.prLong, "real" -> K.prReal))),
         panel(
           div(cls := "ctrls",
-            display <-- prView.signal.map(v => if v == "region" then "flex" else "none"),
+            display <-- prView.signal.map(v => if v == "real" then "none" else "flex"),
             div(cls := "seg",
               Queries.assortments.map { a =>
                 button(tpe := "button", a,
@@ -457,15 +458,22 @@ object App:
           asyncChart(380,
             prView.signal.combineWith(prAssort.signal).combineWith(themeTick.signal).mapTo(()),
             () =>
-              if prView.now() == "region" then
-                Queries.pricesByRegion(prAssort.now()).map(sx =>
-                  Charts.line(sx, tNow(K.axKrM3), zeroBased = true, decimals = 0, xStep = 1))
-              else
-                Queries.pricesReal.map(sx =>
-                  Charts.line(sx, tNow(K.axKrM3), zeroBased = true, decimals = 0))
+              prView.now() match
+                case "region" =>
+                  Queries.pricesByRegion(prAssort.now()).map(sx =>
+                    Charts.line(sx, tNow(K.axKrM3), zeroBased = true, decimals = 0, xStep = 1))
+                case "long" =>
+                  Queries.pricesLong(prAssort.now()).map(sx =>
+                    Charts.line(sx, tNow(K.axKrM3), zeroBased = true, decimals = 0))
+                case _ =>
+                  Queries.pricesReal.map(sx =>
+                    Charts.line(sx, tNow(K.axKrM3), zeroBased = true, decimals = 0))
           ),
           caption(lang.signal.combineWith(prView.signal).map { (_, v) =>
-            tNow(if v == "region" then K.capPrRegion else K.capPrReal)
+            tNow(v match
+              case "region" => K.capPrRegion
+              case "long"   => K.capPrLong
+              case _        => K.capPrReal)
           })
         )
       ),

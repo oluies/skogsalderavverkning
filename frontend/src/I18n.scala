@@ -9,6 +9,8 @@ package skog
 object I18n:
 
   val sv: Map[String, String] = Map(
+    "prLong" -> "Lång serie 1995–",
+    "capPrLong" -> "De två prisserierna hopfogade till 1995–2025. Skogsstyrelsen bytte regionindelning 2019, så den gamla tabellens tre regioner används genomgående — landsdelarna viks ihop till samma tre. Överlappet 2019–2021 låter skarven kontrolleras: Nord skiljer 1,6 procent och Syd 0,8 procent, medan Mellan ligger 6,3 procent fel eftersom Skogsstyrelsens Mellan sträcker sig längre söderut än Svealand. Läs Mellan med den reservationen.",
     "s10h" -> "Handeln, och Ryssland",
     "s10p" -> "SLU mäter skogen men redovisar varken handel eller priser. Utrikeshandeln kommer från SCB, prisen från Skogsstyrelsen — tillsammans är de efterfrågesidan av samma fråga.",
     "trPartner" -> "Import per land",
@@ -122,6 +124,8 @@ object I18n:
   )
 
   val en: Map[String, String] = Map(
+    "prLong" -> "Long series, 1995–",
+    "capPrLong" -> "The two price tables spliced into one 1995–2025 series. Skogsstyrelsen changed its regioning in 2019, so the old table's three regions are used throughout and the landsdelar are folded back into them. The 2019–2021 overlap lets the seam be checked: Nord differs by 1.6% and Syd by 0.8%, while Mellan is 6.3% out because Skogsstyrelsen's Mellan reaches further south than Svealand. Read Mellan with that caveat.",
     "s10h" -> "Trade, and Russia",
     "s10p" -> "SLU measures the forest but publishes neither trade nor prices. Foreign trade comes from SCB, prices from Skogsstyrelsen — together they are the demand side of the same question.",
     "trPartner" -> "Imports by country",
