@@ -96,6 +96,7 @@ object K:
   val unitPrec: String = "unitPrec"
   val unitShare: String = "unitShare"
   val unitYears: String = "unitYears"
+  val vsCountyMean: String = "vsCountyMean"
   val wBonitet: String = "wBonitet"
   val wPrecip: String = "wPrecip"
   val wSnow: String = "wSnow"

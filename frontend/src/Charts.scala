@@ -19,6 +19,14 @@ object Charts:
   private def fixed(v: Double, decimals: Int): String =
     js.Dynamic.global.Number(v).applyDynamic("toFixed")(decimals).toString
 
+  /** Explicit sign, and no "-0.0": toFixed keeps the sign of a negative value
+    * that rounds to zero, which reads as a real decrease.
+    */
+  private def signed(v: Double, decimals: Int): String =
+    val t = fixed(v, decimals)
+    val z = if t.matches("-0(\\.0+)?") then t.drop(1) else t
+    if z.startsWith("-") then z else "+" + z
+
   private def textStyle(color: String, size: Int = 11) =
     obj("color" -> color, "fontFamily" -> "IBM Plex Mono, ui-monospace, monospace",
         "fontSize" -> size)
@@ -283,8 +291,13 @@ object Charts:
 
   /** County x year heatmap, shown beside the map.
     *
-    * The map answers "where, this year"; this answers "where, over time" - the
-    * same values, the same colour scale, one more dimension.
+    * The map answers "where, and at what level"; this answers "where, and how
+    * much has it moved" - each cell is a county's deviation from its own mean,
+    * so the scale is always diverging around zero and is the heatmap's own, not
+    * the map's. Cells are therefore NOT comparable to the map's colours.
+    *
+    * @param relativeTo short qualifier shown in the tooltip and under the
+    *                   legend, so a hovered number is not read as an absolute
     */
   def heatmap(
       areas: Vector[String],
@@ -293,18 +306,19 @@ object Charts:
       label: String,
       unit: String,
       decimals: Int,
-      diverging: Boolean
+      relativeTo: String
   ): js.Object =
     val vals = cells.map(_._3)
-    val (lo, hi) =
-      if vals.isEmpty then (0.0, 1.0)
-      else if diverging then
-        val m = vals.map(math.abs).max
-        (-m, m)
-      else (vals.min, vals.max)
-    val ramp =
-      if diverging then Vector(-1.0, -0.5, 0.0, 0.5, 1.0).map(t => Theme.diverging(t))
-      else Theme.seq
+    // deviations, so the scale is symmetric around zero by construction
+    val m = if vals.isEmpty then 1.0 else math.max(vals.map(math.abs).max, 1e-9)
+    val (lo, hi) = (-m, m)
+    val ramp = Vector(-1.0, -0.5, 0.0, 0.5, 1.0).map(t => Theme.diverging(t))
+
+    // The map's precision is tuned for levels: bonitet at one decimal is right
+    // for values of 2-11, but these deviations span about +/-0.35, where one
+    // decimal collapses the whole signal to a handful of strings and prints
+    // "-0.0" for anything in (-0.05, 0).
+    val dec = if hi - lo < 2 then decimals + 1 else decimals
 
     val tip: js.Function1[js.Dynamic, String] = (p: js.Dynamic) =>
       val d = p.value.asInstanceOf[js.Array[js.Any]]
@@ -312,8 +326,10 @@ object Charts:
       val ar = areas(js.Dynamic.global.Number(d(1)).asInstanceOf[Double].toInt)
       // areas, the axis data and the cell indices all share one order; the
       // axis is inverted for display only, so no index arithmetic is needed
-      val v = fixed(js.Dynamic.global.Number(d(2)).asInstanceOf[Double], decimals)
-      s"<b>$ar</b><br>$yr<br>$label: <b>$v $unit</b>"
+      val raw = js.Dynamic.global.Number(d(2)).asInstanceOf[Double]
+      val v = signed(raw, dec)
+      s"<b>$ar</b><br>$yr<br>$label: <b>$v $unit</b>" +
+        s"<br><span style='opacity:.7'>$relativeTo</span>"
 
     obj(
       "animation" -> false,
@@ -358,11 +374,17 @@ object Charts:
         "orient" -> "horizontal",
         "left" -> "center", "bottom" -> 0,
         "itemWidth" -> 11, "itemHeight" -> 90,
-        "text" -> js.Array(fixed(hi, decimals), fixed(lo, decimals)),
+        "text" -> js.Array(signed(hi, dec), signed(lo, dec)),
         "textStyle" -> obj("color" -> Theme.ink3, "fontSize" -> 10.5,
                            "fontFamily" -> "IBM Plex Mono, monospace"),
         "inRange" -> obj("color" -> ramp.toJSArray)
       ),
+      // the legend endpoints are deviations too, so say so beneath them
+      "graphic" -> js.Array[js.Any](obj(
+        "type" -> "text", "left" -> "center", "bottom" -> 0, "silent" -> true,
+        "style" -> obj("text" -> relativeTo, "fill" -> Theme.ink3,
+                       "fontSize" -> 10, "fontFamily" -> "IBM Plex Sans, sans-serif")
+      )),
       "series" -> js.Array[js.Any](obj(
         "type" -> "heatmap",
         "data" -> cells.map { case (x, y, v) =>

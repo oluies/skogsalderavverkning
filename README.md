@@ -178,6 +178,14 @@ after adding or removing a string.
 complete document), the compiled bundle, the loader and `site/data/`.
 
 
+**Parquet exports are not bit-reproducible.** Re-running the pipeline over
+unchanged inputs can shift a handful of values by one unit in the last decimal:
+`avg()` runs in parallel, so the summation order varies, and a value sitting on
+a rounding boundary lands either side of it. A rebuild of `climate_county` moved
+11 of 3459 rows by 0.001 with identical station counts. Before reading a parquet
+diff as a data change, check it that way — row counts and a column sum — rather
+than trusting the bytes.
+
 ## Notes on the browser stack
 
 **Scala.js links with `moduleKind none`.** ECharts and the DuckDB loader are reached as

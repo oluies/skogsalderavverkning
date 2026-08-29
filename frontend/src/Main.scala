@@ -302,9 +302,9 @@ object App:
                                     counts, tNow(K.tipStations), tNow(K.tipNoData))
                 }
             ),
-            // Beside the map: the same values over time where there is a yearly
-            // series, otherwise a ranked list - a heatmap of one column per
-            // county would say nothing the map has not already said.
+            // Beside the map: each county's deviation from its own mean over
+            // time where there is a yearly series, otherwise a ranked list - a
+            // heatmap of one column per county would say nothing new.
             div(
               asyncChart(620,
                 mapView.signal.combineWith(themeTick.signal).mapTo(()),
@@ -313,10 +313,9 @@ object App:
                   val (unitKey, dec, div_) = metricFormat(v)
                   Queries.heatmap(v).flatMap {
                     case Some((areas, years, cells)) =>
-                      // always diverging: the cells are deviations from each
-                      // county's own mean, so zero is a real midpoint
                       Future.successful(Charts.heatmap(areas, years, cells,
-                        tNow(metricLabel(v)), tNow(unitKey), dec, diverging = true))
+                        tNow(metricLabel(v)), tNow(unitKey), dec,
+                        relativeTo = tNow(K.vsCountyMean)))
                     case None =>
                       Queries.mapMetric(v, mapYear.now()).map { (vals, _) =>
                         Charts.ranked(vals, tNow(metricLabel(v)), tNow(unitKey), dec, div_)
