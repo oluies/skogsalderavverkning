@@ -371,6 +371,33 @@ object Queries:
         Decode.opt(r, "pct_diff").map(v => Decode.str(r, "region3") -> v)
       })
 
+  /** Orchid observations around a felling notice, inside the notified polygon
+    * against a 500 m ring outside it, each scaled by its own before-period.
+    */
+  def orchidEvent: Future[Vector[Series]] =
+    SkogDb.query(
+      """SELECT zone, bin_day, rel_to_baseline FROM orchid_event
+         ORDER BY zone, bin_day"""
+    ).map { rows =>
+      val zones = Vector("inside", "ring")
+      val labels = Map("inside" -> insideLabel, "ring" -> ringLabel)
+      grouped(rows, "zone", "bin_day", "rel_to_baseline", zones,
+        k => Theme.slot(if k == "inside" then 3 else 0))
+        .map(sx => sx.copy(name = labels.getOrElse(sx.name, sx.name)))
+    }
+
+  private var insideLabel = "Inne i anmälan"
+  private var ringLabel = "500 m runt om"
+  def setZoneLabels(a: String, b: String): Unit = { insideLabel = a; ringLabel = b }
+
+  /** How many counties a single recorder covers, as a distribution. */
+  def orchidReach: Future[Vector[(Int, Int)]] =
+    SkogDb.query("SELECT counties, n_recorders FROM orchid_reach ORDER BY counties")
+      .map(_.toVector.flatMap { r =>
+        for a <- Decode.opt(r, "counties"); b <- Decode.opt(r, "n_recorders")
+        yield (a.toInt, b.toInt)
+      })
+
   /** Figures quoted in prose, keyed by name. */
   def meta: Future[Map[String, Double]] =
     SkogDb.query("SELECT k, v FROM meta").map { rows =>

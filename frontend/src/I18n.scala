@@ -9,6 +9,16 @@ package skog
 object I18n:
 
   val sv: Map[String, String] = Map(
+    "s13h" -> "Rapporteras arter efter avverkningsanmälan?",
+    "s13p" -> "En avverkningsanmälan är offentlig och lämnas sex veckor i förväg. Frågan är om fynd av fridlysta arter — orkidéer är standardexemplet — samlas på just den mark som anmälts. Skogsstyrelsens 118 850 anmälningspolygoner möter 259 265 orkidéfynd från Artportalen via GBIF.",
+    "capOrchid" -> "Orkidéfynd per 30-dagarsperiod, skalade mot varje zons eget medelvärde före anmälan. Kontrollen är rumslig: en 500-metersring runt polygonen har samma grannskap, samma rapportörer, samma årstid och samma rapporteringstrend — men är inte den mark som annonserats. Före anmälan ligger båda platt kring 1. Månaden efter går insidan till 37 gånger sitt eget normalläge, ringen till 4. Över hela året efter: +784 procent inne mot +70 procent i ringen.",
+    "orZone" -> "Fynd kring anmälan",
+    "orReach" -> "Rapportörernas räckvidd",
+    "capOrchidReach" -> "Antal län per rapportör, bland fynden inne i anmäld mark året efter anmälan. 532 rapportörer står för 7 532 fynd. Det är koncentrerat i volym — 20 personer står för 44 procent — men lokalt i geografi: 480 av 532 rapporterar i ett enda län, och den som når vidast täcker åtta.",
+    "axRel" -> "gånger normalläget",
+    "axRecorders" -> "antal rapportörer",
+    "zInside" -> "Inne i anmälan",
+    "zRing" -> "500 m runt om",
     "lblHa" -> "Hektar",
     "s12h" -> "Hindrar reglerna avverkning?",
     "s12p" -> "En vanlig farhåga är att LULUCF, EU:s skogspolitik och svenskt naturskydd ska stoppa avverkning — och att skogsägare därför avverkar i förtid. Anmälningarna är stället där det skulle synas: man måste anmäla sex veckor i förväg, så serien mäter avsikt.",
@@ -139,6 +149,16 @@ object I18n:
   )
 
   val en: Map[String, String] = Map(
+    "s13h" -> "Are species reported after a felling notice?",
+    "s13p" -> "A felling notification is public and filed six weeks ahead. The question is whether records of protected species — orchids being the standard example — concentrate on the ground that was notified. Skogsstyrelsen's 118,850 notification polygons meet 259,265 orchid records from Artportalen via GBIF.",
+    "capOrchid" -> "Orchid records per 30-day period, scaled to each zone's own pre-notice mean. The control is spatial: a 500 m ring around the polygon shares its neighbourhood, its recorders, its season and its reporting trend — but is not the ground that was advertised. Before the notice both sit flat near 1. In the month after, the inside goes to 37 times its own normal, the ring to 4. Over the whole following year: +784% inside against +70% in the ring.",
+    "orZone" -> "Records around the notice",
+    "orReach" -> "How far recorders range",
+    "capOrchidReach" -> "Counties per recorder, among records inside notified ground in the year after a notice. 532 recorders account for 7,532 records. Concentrated by volume — 20 people supply 44% — but local in geography: 480 of 532 report in a single county, and the widest-ranging covers eight.",
+    "axRel" -> "× normal",
+    "axRecorders" -> "recorders",
+    "zInside" -> "Inside the notice",
+    "zRing" -> "500 m ring",
     "lblHa" -> "Hectares",
     "s12h" -> "Do the rules stop felling?",
     "s12p" -> "A common fear is that LULUCF, EU forest policy and domestic conservation will prevent felling — and that owners therefore fell early. Notifications are where that would show: an owner must notify six weeks ahead, so the series records intent.",

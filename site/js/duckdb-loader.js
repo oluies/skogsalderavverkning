@@ -19,6 +19,7 @@ const TABLES = [
   "damage", "natural_loss", "meta",
   "wood_trade", "prices_region", "prices_real", "prices_long",
   "prices_splice_check", "notifications", "denied_felling", "protection",
+  "orchid_event", "orchid_summary", "orchid_reach",
 ];
 
 async function boot() {

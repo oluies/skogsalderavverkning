@@ -1,7 +1,15 @@
 # Do red-listed species get reported right after a felling notice?
 
-Scope for an analysis that is **not yet built**. Everything below about data
-availability was verified against the live sources, not assumed.
+**Built.** Results are in the page's *Rapporteras arter efter avverkningsanmälan?*
+section; this document records the design and what it can carry.
+
+The control changed during the build. Rosaceae as a control *taxon* proved
+impractical — GBIF rate-limits after a large pull, and the national fetch would
+have taken hours — and a **spatial** control turned out to be better anyway: a
+500 m ring around each notified polygon shares the neighbourhood, the recorders,
+the season and the reporting trend, and needs no second download. It also tests
+something sharper: whether reporting targets *the notified stand* or merely the
+area around it.
 
 ## The question
 
@@ -97,3 +105,40 @@ Roughly one to two days. The data acquisition and the spatial join are
 straightforward — both sides land in DuckDB with the geometry already in
 SWEREF99 TM. Nearly all the work is in the control design and the phenology
 handling, which is also where the result lives or dies.
+
+## Result
+
+| Zone | Before | After | Change |
+|---|---|---|---|
+| Inside the notified polygon | 852 | 7,532 | **+784%** |
+| 500 m ring outside it | 11,466 | 19,504 | +70% |
+
+Both zones sit flat near 1.0× their own baseline through the whole year before
+the notice — the parallel pre-trend the design needs. In the first month after,
+the inside reaches **37× its own normal** and the ring 4×. The inside stays
+4–7× for the rest of the year.
+
+A rise begins in the 30 days *before* the notice (3.6× inside). That fits the
+pre-felling survey: a consultant walks the stand, records what is there, and
+the notification is filed afterwards.
+
+**Recorders.** 532 people supply the 7,532 post-notice records inside notified
+ground. Concentrated by volume — the top 20 account for 44%, the top 100 for
+80% — but local in geography: 480 of 532 report in a single county, 37 in two,
+and only twelve range across three or more. The widest covers eight.
+
+## What this does not establish
+
+It does not show intent, and it does not show that any record is false. A
+notification is public precisely so the ground can be checked, and a pre-felling
+survey is normal practice. Both "someone checks a stand that was just advertised
+for felling" and "someone reports strategically to stop it" produce this shape.
+The data separates *where* reporting happens from *why* it happens only in the
+first sense.
+
+One correction to an assumption made while scoping: a design flaw would have
+manufactured this result on its own. The notification feed reaches back to
+August 2021 and the observations to January 2021, so early notices lose part of
+their before-window and late ones part of their after-window — 7,019 and 38,467
+notices. The analysis keeps only notices with a full year of coverage either
+side. The +784% survives that restriction.

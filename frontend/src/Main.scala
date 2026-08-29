@@ -23,6 +23,7 @@ object App:
   private val prAssort = Var("Tallsågtimmer")
   private val rgView   = Var("notif")
   private val splice   = Var("")
+  private val orView   = Var("zone")
   private val weights  = Var(Map("bonitet" -> 1.0, "temp" -> 1.0, "precip" -> 1.0, "snow" -> 0.0))
   private val drivers  = Var(Vector.empty[Driver])
   private val themeTick = Var(0)   // bumped on theme change to force re-render
@@ -509,6 +510,28 @@ object App:
               case "denied" => K.capRgDenied
               case "prot"   => K.capRgProt
               case _        => K.capRgNotif)
+          })
+        )
+      ),
+
+      section(K.s13h, K.s13p,
+        Some(segmented(orView, Vector("zone" -> K.orZone, "reach" -> K.orReach))),
+        panel(
+          asyncChart(400,
+            orView.signal.combineWith(lang.signal).combineWith(themeTick.signal).mapTo(()),
+            () =>
+              if orView.now() == "zone" then
+                Queries.setZoneLabels(tNow(K.zInside), tNow(K.zRing))
+                Queries.orchidEvent.map(sx =>
+                  Charts.line(sx, tNow(K.axRel), zeroBased = true, decimals = 1))
+              else
+                Queries.orchidReach.map { rows =>
+                  Charts.ranked(rows.map((c, n) => (s"$c", n.toDouble)).toMap,
+                    tNow(K.axRecorders), "", 0, diverging = false)
+                }
+          ),
+          caption(lang.signal.combineWith(orView.signal).map { (_, v) =>
+            tNow(if v == "zone" then K.capOrchid else K.capOrchidReach)
           })
         )
       ),
