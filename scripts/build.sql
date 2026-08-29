@@ -481,6 +481,18 @@ CREATE OR REPLACE TABLE latest_volumes AS
 SELECT region, assortment, m3fub FROM volumes_region
 QUALIFY row_number() OVER (PARTITION BY region, assortment ORDER BY year DESC) = 1;
 
+-- A year's own volumes where they exist, the most recent available only where
+-- they do not. Carrying forward unconditionally would have overwritten the
+-- 2019-2023 weights that Skogsstyrelsen does publish.
+CREATE OR REPLACE TABLE weights AS
+SELECT p.region, p.assortment, p.year,
+       coalesce(v.m3fub, l.m3fub) AS m3fub
+FROM (SELECT DISTINCT region, assortment, year FROM prices_region) p
+LEFT JOIN volumes_region v
+  ON v.region = p.region AND v.assortment = p.assortment AND v.year = p.year
+LEFT JOIN latest_volumes l
+  ON l.region = p.region AND l.assortment = p.assortment;
+
 -- Roundwood prices per assortment and landsdel, 2019 onward. "Sortiment" is
 -- per species for the sawlog grades
 -- (Tallsagtimmer, Gransagtimmer, and the pulpwood grades).
@@ -549,8 +561,8 @@ WITH old AS (
          p.assortment, p.year,
          sum(p.kr_m3fub * coalesce(v.m3fub, 1)) / sum(coalesce(v.m3fub, 1)) AS kr
   FROM prices_region p
-  LEFT JOIN latest_volumes v
-    ON v.region = p.region AND v.assortment = p.assortment
+  LEFT JOIN weights v
+    ON v.region = p.region AND v.assortment = p.assortment AND v.year = p.year
   WHERE p.region <> 'Hela landet'
   GROUP BY 1, 2, 3
 )
@@ -575,8 +587,8 @@ WITH old AS (
          p.assortment, p.year,
          sum(p.kr_m3fub * coalesce(v.m3fub, 1)) / sum(coalesce(v.m3fub, 1)) AS kr
   FROM prices_region p
-  LEFT JOIN latest_volumes v
-    ON v.region = p.region AND v.assortment = p.assortment
+  LEFT JOIN weights v
+    ON v.region = p.region AND v.assortment = p.assortment AND v.year = p.year
   WHERE p.region <> 'Hela landet' GROUP BY 1,2,3
 )
 SELECT o.region3,

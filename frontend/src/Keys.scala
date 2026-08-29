@@ -10,9 +10,10 @@ package skog
 object K:
   val asGran: String = "asGran"
   val asMassa: String = "asMassa"
+  val asMassaBarr: String = "asMassaBarr"
+  val asMassaLov: String = "asMassaLov"
   val asTall: String = "asTall"
   val axBon: String = "axBon"
-  val axCount: String = "axCount"
   val axDays: String = "axDays"
   val axHa: String = "axHa"
   val axIdxX: String = "axIdxX"

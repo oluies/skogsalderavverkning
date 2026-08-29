@@ -1,4 +1,12 @@
-# Do red-listed species get reported right after a felling notice?
+# Do orchid records cluster right after a felling notice?
+
+**On terminology.** Three different populations get conflated in this debate and
+this document keeps them apart. *Fridlysta* (protected) is the category with
+legal effect on felling, and **all wild Swedish orchids are fridlysta** — that is
+why they are the emblematic case. *Rödlistad* (red-listed) is a narrower
+conservation-status category that overlaps it but is not the same set. What is
+measured here is neither: it is **all of Orchidaceae**, because that is the
+taxonomic unit GBIF filters on. Every figure below is Orchidaceae.
 
 **Built.** Results are in the page's *Rapporteras arter efter avverkningsanmälan?*
 section; this document records the design and what it can carry.
@@ -43,7 +51,18 @@ GBIF, which needs no API key.
 
 The 10 m median matters: notified polygons average a few hectares, so the
 coordinates are precise enough to place an observation inside or outside one.
-This was the assumption most likely to sink the study, and it holds.
+
+But the number that actually decides feasibility is neither of the two totals —
+it is how many observations fall **inside** a polygon at all, and that was not
+checked at scope time. It should have been. Measured during the build: **8,384**
+orchid records land inside a notified polygon within a year either side of its
+notice, across 1,669 polygons and 532 recorders. That is enough to work with;
+had it been a few hundred, the design would have needed rethinking before any of
+it was written.
+
+Precision is decided by the tail, not the median: a 4 ha stand has a ~110 m
+equivalent radius, so a record accurate to 350 m can land in the wrong zone. The
+build therefore reports the result split by coordinate band — see below.
 
 **Implementation constraint.** GBIF's search API refuses `offset > 100001`, so
 263k records cannot be paged in one query. Partition by year × county (each
@@ -59,9 +78,11 @@ A difference-in-differences event study, with the polygon as its own control.
   the dominant confounder, that Artportalen coverage is wildly uneven in space.
   Comparing notified to un-notified *places* would measure recorder density;
   comparing a polygon to itself before and after does not.
-- **Control taxon**: Rosaceae (327,941 georeferenced observations in the same
-  window). A comparable plant family with a similar recorder community and
-  similar seasonality, but **no legal effect on felling**.
+- **Control**: a 500 m ring around each polygon. *(Changed from the originally
+  planned Rosaceae control. The seasonality argument for it was weak anyway —
+  orchids are findable only in flower, roughly May–July, while Rosaceae spans
+  early-flowering shrubs to autumn fruiting, so the two are not matched on
+  detectability. The ring is matched on everything by construction.)*
 
 The estimand is the orchid pre→post change *minus* the Rosaceae pre→post change.
 That difference is the whole point: a bare orchid increase after a notice proves
@@ -74,15 +95,18 @@ being tested.
 ## What would break it
 
 1. **Detection bias.** Notified ground attracts foresters, neighbours and NGOs.
-   The control taxon absorbs the general part of this, but only if orchid and
-   Rosaceae recorders behave alike, which is an assumption, not a fact.
+   The ring absorbs the general part of this: it is the same neighbourhood, with
+   the same recorders and the same season.
 2. **Phenology.** Orchids are findable only in flower, roughly May–July.
    Notifications have their own seasonality. Windows must be day-of-year matched
    or the model must carry month effects, or the result is a season artefact.
 3. **Selection into treatment.** A known orchid site may deter a notification in
    the first place, which biases the pre-period downward.
 4. **Post-felling habitat change.** Once felled, the ground is a different
-   habitat; windows extending past the actual felling measure something else.
+   habitat, so windows reaching past the felling measure something else — and
+   the GeoPackage carries no felling date, only `ArendeStatus` and `AvvHa`, so
+   this cannot be controlled for with the fields available. It is a live
+   limitation, not a handled one.
 5. **Reporting growth.** Artportalen submissions trend upward year on year; a
    naive pre/post comparison partly measures that trend.
 6. **Five years only.** The notification feed is a rolling window, so there is no
@@ -142,3 +166,31 @@ August 2021 and the observations to January 2021, so early notices lose part of
 their before-window and late ones part of their after-window — 7,019 and 38,467
 notices. The analysis keeps only notices with a full year of coverage either
 side. The +784% survives that restriction.
+
+## Sources and terms
+
+- **Skogsstyrelsen, avverkningsanmälningar** — open INSPIRE data.
+  <https://geodpags.skogsstyrelsen.se/geodataport/feeds/AvverkAnm.xml>
+- **GBIF**, mirroring **Artportalen** (SLU Artdatabanken). Occurrence data are
+  CC-BY or CC0 depending on the contributing dataset; Artportalen's records
+  carry the observer's name as published. <https://www.gbif.org>
+
+GBIF asks that analyses cite a download DOI so the exact extract is
+reproducible. This build pages the search API rather than using the download
+service, so it has no DOI — a real weakness for reproducibility, and the reason
+each row is stored with its `gbif_url` so any record can be resolved
+individually.
+
+## Coordinate-precision sensitivity
+
+The headline holds, and strengthens, on the precise records:
+
+| Coordinate accuracy | Inside, before → after | Ring, before → after |
+|---|---|---|
+| ≤ 50 m | 782 → 7,379 (+844%) | 8,609 → 17,705 (+106%) |
+| 51–250 m | 15 → 71 | 592 → 553 |
+| > 250 m | 52 → 81 | 2,234 → 1,196 |
+
+The effect is carried by the well-located records. The imprecise tail is noise
+in both directions, which is what it should look like if the join is doing its
+job rather than manufacturing the result.

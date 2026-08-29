@@ -257,10 +257,10 @@ object Queries:
     * 2023, and Gotaland's breakdown ends in 2022, so offering it would draw
     * lines that stop mid-chart while their neighbours run to 2025.
     */
-  val assortments = Vector("Tallsågtimmer", "Gransågtimmer", "Massaved, totalt")
-
   /** Assortment paired with its label key, so the two cannot drift apart the
     * way a positional zip against a Vector in another file can. */
+  val assortments: Vector[String] = assortmentLabels.map(_._1)
+
   val assortmentLabels: Vector[(String, String)] = Vector(
     "Tallsågtimmer"    -> K.asTall,
     "Gransågtimmer"    -> K.asGran,
@@ -296,8 +296,12 @@ object Queries:
   /** The real series carries its own assortments: it ends in 2022, before the
     * rename, and has no pulpwood total at all - so it cannot use `assortments`.
     */
-  val realAssortments = Vector("Tallsågtimmer", "Gransågtimmer",
-                               "Massaved, barr", "Massaved, löv")
+  val realAssortmentLabels: Vector[(String, String)] = Vector(
+    "Tallsågtimmer"  -> K.asTall,
+    "Gransågtimmer"  -> K.asGran,
+    "Massaved, barr" -> K.asMassaBarr,
+    "Massaved, löv"  -> K.asMassaLov)
+  val realAssortments: Vector[String] = realAssortmentLabels.map(_._1)
 
   /** National prices in 2022 money, back to 1967. */
   def pricesReal: Future[Vector[Series]] =
@@ -305,8 +309,10 @@ object Queries:
       """SELECT assortment, year, kr_m3fub_2022 FROM prices_real
          ORDER BY assortment, year"""
     ).map { rows =>
+      val label = realAssortmentLabels.toMap
       grouped(rows, "assortment", "year", "kr_m3fub_2022", realAssortments,
         k => Theme.slot(realAssortments.indexOf(k)))
+        .map(sx => sx.copy(name = translate(label.getOrElse(sx.name, sx.name))))
     }
 
   /** Notified felling area nationally, the forward-looking series.
@@ -359,6 +365,10 @@ object Queries:
         recs.collect { case ("ha", Some(y), Some(v)) => Pt(y, v) }.sortBy(_.x)))
         .filter(_.data.nonEmpty)
     }
+
+  /** Set by the view so data-layer series can carry translated names. */
+  private var translate: String => String = identity
+  def setTranslator(f: String => String): Unit = translate = f
 
   /** Measured agreement between the two price tables in their overlap.
     *

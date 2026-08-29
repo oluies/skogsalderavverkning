@@ -59,9 +59,15 @@ def rows_for(taxon_key, year, month):
                 f"https://www.gbif.org/occurrence/{o.get('gbifID')}",
                 o.get("datasetKey") or "",
             ))
-        if r.get("endOfRecords") or off + PAGE > 100000:
+        if r.get("endOfRecords"):
             return out
         off += PAGE
+        if off + PAGE > 100000:
+            # Silently returning here would make a truncated partition
+            # indistinguishable from a complete one.
+            raise RuntimeError(
+                f"partition {year}-{month:02d} exceeds GBIF's offset cap "
+                f"({r.get('count')} records); split it further")
 
 
 if __name__ == "__main__":
@@ -74,8 +80,11 @@ if __name__ == "__main__":
         # One partition per (year, month): far below GBIF's offset cap, and
         # independent, so they can run concurrently. Serially this took hours.
         parts = [(y, m) for y in YEARS for m in range(1, 13)]
+        # Write to a temporary file and rename only on success, so a failed
+        # run cannot leave a partial CSV that the guard above then skips.
+        tmp = dest + ".part"
         total = 0
-        with open(dest, "w", newline="", encoding="utf-8") as fh:
+        with open(tmp, "w", newline="", encoding="utf-8") as fh:
             w = csv.writer(fh)
             w.writerow(["gbif_id", "family", "species", "event_date",
                         "lat", "lon", "uncertainty_m", "recorder", "gbif_url",
@@ -87,4 +96,5 @@ if __name__ == "__main__":
                     if (i + 1) % 6 == 0:
                         print(f"  {label}: {i+1}/{len(parts)} partitions, "
                               f"{total} rows", flush=True)
+        os.replace(tmp, dest)
         print(f"{label.upper()} DONE {total} rows -> {dest}", flush=True)

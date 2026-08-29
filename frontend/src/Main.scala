@@ -486,7 +486,11 @@ object App:
               case "region" => K.capPrRegion
               case "long"   => K.capPrLong
               case _        => K.capPrReal)
-            base.replace("{splice}", splice.now())
+            // until the measurement arrives the sentence would end in a bare
+            // colon, so drop the clause rather than render half of it
+            val sp = splice.now()
+            if sp.isEmpty then base.replaceAll("[^.]*\\{splice\\}[^.]*\\.\\s*", "")
+            else base.replace("{splice}", sp)
           })
         )
       ),
@@ -498,7 +502,9 @@ object App:
           asyncChart(380,
             rgView.signal.combineWith(lang.signal).combineWith(themeTick.signal).mapTo(()),
             () =>
-              val axis = if rgView.now() == "denied" then K.axCount else K.axHa
+              // every view in this panel is an area series now; the count for
+              // refused felling lives in the caption, not on the axis
+              val axis = K.axHa
               val f = rgView.now() match
                 case "denied" => Queries.deniedFelling(tNow(K.lblHa))
                 case "prot"   => Queries.protection(tNow(K.lblHa))
@@ -663,6 +669,7 @@ object App:
     el
 
   def start(): Unit =
+    Queries.setTranslator(k => tNow(k))
     dom.document.documentElement.setAttribute("lang", lang.now())
     val mount = dom.document.getElementById("app")
     render(mount, apply())

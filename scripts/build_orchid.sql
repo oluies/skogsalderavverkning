@@ -12,14 +12,15 @@
 -- before-window and the late ones part of their after-window, which alone
 -- would manufacture a post-notice spike.
 -- ---------------------------------------------------------------------------
-INSTALL spatial; LOAD spatial;
 .bail on
+INSTALL spatial; LOAD spatial;
 
 CREATE OR REPLACE TABLE obs_orchid AS
-SELECT gbif_id, species, CAST(event_date AS DATE) AS obs_date, recorder, gbif_url,
+SELECT gbif_id, species, TRY_CAST(event_date AS DATE) AS obs_date, recorder, gbif_url,
+       TRY_CAST(uncertainty_m AS DOUBLE) AS uncertainty_m,
        ST_Transform(ST_Point(lon, lat), 'EPSG:4326', 'EPSG:3006', true) AS geom
 FROM read_csv('data/raw/gbif_orchid.csv', header=true)
-WHERE event_date IS NOT NULL;
+WHERE TRY_CAST(event_date AS DATE) IS NOT NULL;
 
 CREATE OR REPLACE TABLE obs_window AS
 SELECT min(obs_date) AS first_obs, max(obs_date) AS last_obs FROM obs_orchid;
@@ -38,12 +39,12 @@ SELECT case_id, county, notice_date,
 FROM notices;
 
 CREATE OR REPLACE TABLE zoned AS
-SELECT 'inside' AS zone, o.recorder, n.county, n.case_id,
+SELECT 'inside' AS zone, o.recorder, o.uncertainty_m, n.county, n.case_id,
        date_diff('day', n.notice_date, o.obs_date) AS days_from_notice
 FROM obs_orchid o JOIN notices n ON ST_Within(o.geom, n.geom)
 WHERE abs(date_diff('day', n.notice_date, o.obs_date)) <= 365
 UNION ALL
-SELECT 'ring', o.recorder, r.county, r.case_id,
+SELECT 'ring', o.recorder, o.uncertainty_m, r.county, r.case_id,
        date_diff('day', r.notice_date, o.obs_date)
 FROM obs_orchid o JOIN rings r ON ST_Within(o.geom, r.geom)
 WHERE abs(date_diff('day', r.notice_date, o.obs_date)) <= 365;
@@ -64,11 +65,15 @@ FROM b JOIN base USING (zone)
 WHERE b.bin_day BETWEEN -360 AND 330;
 
 CREATE OR REPLACE TABLE orchid_summary AS
+-- Both windows are exactly 365 days. Counting day 0 as "post" and running to
+-- +365 would make the after-window a day longer than the before-window, which
+-- inflates the change by construction before any real effect is measured.
 SELECT zone,
-       count(*) FILTER (days_from_notice < 0)  AS pre,
-       count(*) FILTER (days_from_notice >= 0) AS post,
-       round(100.0 * count(*) FILTER (days_from_notice >= 0)
-             / nullif(count(*) FILTER (days_from_notice < 0), 0) - 100, 1) AS pct_change
+       count(*) FILTER (days_from_notice BETWEEN -365 AND -1) AS pre,
+       count(*) FILTER (days_from_notice BETWEEN 0 AND 364)   AS post,
+       round(100.0 * count(*) FILTER (days_from_notice BETWEEN 0 AND 364)
+             / nullif(count(*) FILTER (days_from_notice BETWEEN -365 AND -1), 0) - 100, 1)
+         AS pct_change
 FROM zoned GROUP BY zone;
 
 -- Who reports. Aggregates only: the local table carries the observer name as
@@ -105,3 +110,16 @@ COPY (SELECT zone, pre, post, pct_change FROM orchid_summary)
   TO 'site/data/orchid_summary.parquet' (FORMAT parquet, COMPRESSION zstd);
 COPY (SELECT counties, n_recorders FROM orchid_reach)
   TO 'site/data/orchid_reach.parquet' (FORMAT parquet, COMPRESSION zstd);
+
+-- Sensitivity: point-in-polygon is decided by the coordinate tail, not the
+-- median. A 4 ha stand has a ~110 m equivalent radius, so a record accurate to
+-- 350 m can land in the wrong zone. Re-run the headline on precise records only.
+CREATE OR REPLACE TABLE orchid_precision AS
+SELECT CASE WHEN uncertainty_m IS NULL THEN 'unknown'
+            WHEN uncertainty_m <= 50 THEN '<=50 m'
+            WHEN uncertainty_m <= 250 THEN '51-250 m'
+            ELSE '>250 m' END AS precision_band,
+       zone,
+       count(*) FILTER (days_from_notice BETWEEN -365 AND -1) AS pre,
+       count(*) FILTER (days_from_notice BETWEEN 0 AND 364)   AS post
+FROM zoned GROUP BY 1, 2 ORDER BY 1, 2;

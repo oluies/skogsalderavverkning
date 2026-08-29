@@ -36,6 +36,8 @@ function over calendar years, not a JavaScript loop.
 | Felling notifications | Skogsstyrelsen, Avverkningsanmälan | county × owner, 1995–2025 |
 | Refused felling (montane) | Skogsstyrelsen, formellt skydd tab. 7 | county, 2020–2025 |
 | Habitat protection | Skogsstyrelsen, formellt skydd tab. 1 | landsdel, 1994–2025 |
+| Felling notification polygons | Skogsstyrelsen INSPIRE geodata | 127,884 polygons, 2021–2026 |
+| Species observations | GBIF, mirroring Artportalen | Orchidaceae, 2021–2026 |
 | Roundwood prices, real | Skogsstyrelsen, Ekonomi tabell 4 | national, 1967/68–2022 |
 
 SLU's PxWeb API root is `https://skogsstatistik.slu.se/api/v1/sv/OffStat`
@@ -150,8 +152,12 @@ attribution when reused:
 - **Natural Earth** 10m admin-1 boundaries — public domain.
   <https://www.naturalearthdata.com>
 - **SCB** (Statistics Sweden), foreign trade in goods. <https://www.scb.se>
-- **Skogsstyrelsen** (Swedish Forest Agency), roundwood prices.
+- **Skogsstyrelsen** (Swedish Forest Agency), roundwood prices, felling
+  statistics and the open INSPIRE notification geodata.
   <https://www.skogsstyrelsen.se>
+- **GBIF**, mirroring **Artportalen** (SLU Artdatabanken), for species
+  observations. Licences are per contributing dataset (CC0 or CC-BY), and
+  Artportalen records carry the observer name as published. <https://www.gbif.org>
 
 If you reuse the figures, cite SLU and SMHI rather than this repository. Note
 that the numbers here are *derived* — five-year means restated, anomalies
@@ -261,7 +267,7 @@ compensation for denied felling in montane forest, 693 refusals covering 30,206
 ha of productive forest have been compensated at 1.21 billion SEK. That is large
 in money and small in area: the whole six-year total is a little over a tenth of
 a single year's notifications. Meanwhile new habitat protection is falling, not rising: it peaked in 2002 at
-2,204 ha/yr, ran at 1,000–1,900 through the 2010s, and has been at 500–800
+2,204 ha/yr, ran between 748 and 1,865 through the 2010s, and has been at 500–800
 since 2020.
 
 No official statistics exist on obstruction of individual clear-cuts — that
