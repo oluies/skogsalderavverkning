@@ -251,7 +251,13 @@ object Queries:
       }
     }
 
-  val assortments = Vector("Tallsågtimmer", "Gransågtimmer", "Björkmassaved")
+  /** Sawlogs first, then pulpwood: two different markets, and the section
+    * splits on that. Pulpwood is the total rather than the softwood/hardwood
+    * split: Skogsstyrelsen stopped publishing that split per landsdel after
+    * 2023, and Gotaland's breakdown ends in 2022, so offering it would draw
+    * lines that stop mid-chart while their neighbours run to 2025.
+    */
+  val assortments = Vector("Tallsågtimmer", "Gransågtimmer", "Massaved, totalt")
 
   /** Roundwood price per landsdel for one assortment, kr/m3fub. */
   def pricesByRegion(assortment: String): Future[Vector[Series]] =

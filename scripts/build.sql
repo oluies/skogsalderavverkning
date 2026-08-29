@@ -446,14 +446,31 @@ SELECT direction,
          ELSE raw.kn END AS kn_label
 FROM raw raw;
 
+
+-- Skogsstyrelsen renamed the pulpwood assortments in 2024: Barrmassaved and
+-- Bjorkmassaved stop after 2023 and "Massaved av barrtrad" / "av lovtrad"
+-- begin in 2024. Left alone the pulpwood series simply dies mid-chart, so the
+-- old and new names are folded into one canonical assortment each.
+CREATE OR REPLACE MACRO canon_assortment(a) AS
+  CASE a
+    WHEN 'Barrmassaved'         THEN 'Massaved, barr'
+    WHEN 'Massaved av barrträd' THEN 'Massaved, barr'
+    WHEN 'Björkmassaved'        THEN 'Massaved, löv'
+    WHEN 'Massaved av lövträd'  THEN 'Massaved, löv'
+    WHEN 'Massaved'             THEN 'Massaved, totalt'
+    WHEN 'Massaved totalt'      THEN 'Massaved, totalt'
+    ELSE a
+  END;
+
 CREATE OR REPLACE TABLE volumes_region AS
 SELECT CASE "Landsdel" WHEN 'Norra Norrland' THEN 'N Norrland'
                        WHEN 'Södra Norrland' THEN 'S Norrland'
                        ELSE "Landsdel" END AS region,
-       "Sortiment" AS assortment, CAST("År" AS INT) AS year,
-       CAST(value AS DOUBLE) AS m3fub
+       canon_assortment("Sortiment") AS assortment, CAST("År" AS INT) AS year,
+       sum(CAST(value AS DOUBLE)) AS m3fub
 FROM read_csv('data/raw/volumes_region_2019_2025.csv', header=true, all_varchar=true)
-WHERE value <> '';
+WHERE value <> ''
+GROUP BY 1, 2, 3;
 
 -- Roundwood prices per assortment and landsdel, 2019 onward. "Sortiment" is
 -- per species for the sawlog and pulpwood grades that matter here
@@ -465,7 +482,7 @@ SELECT
        CASE "Landsdel" WHEN 'Norra Norrland' THEN 'N Norrland'
                        WHEN 'Södra Norrland' THEN 'S Norrland'
                        ELSE "Landsdel" END AS region,
-       "Sortiment" AS assortment,
+       canon_assortment("Sortiment") AS assortment,
        CAST("År" AS INT) AS year, CAST(value AS DOUBLE) AS kr_m3fub
 FROM read_csv('data/raw/prices_region_2019_2025.csv', header=true, all_varchar=true)
 WHERE value <> '';
@@ -480,7 +497,7 @@ WHERE value <> '';
 -- calendar label wins, since that is the basis the series continues on.
 CREATE OR REPLACE TABLE prices_real AS
 SELECT assortment, year, kr_m3fub_2022 FROM (
-  SELECT "Sortiment" AS assortment,
+  SELECT canon_assortment("Sortiment") AS assortment,
          CAST(substr("År", 1, 4) AS INT) AS year,
          CAST(value AS DOUBLE) AS kr_m3fub_2022,
          contains("År", '/') AS is_season

@@ -9,10 +9,10 @@ package skog
 object I18n:
 
   val sv: Map[String, String] = Map(
-    "seam" -> "skarv",
     "asTall" -> "Tallsågtimmer",
     "asGran" -> "Gransågtimmer",
-    "asBjork" -> "Björkmassaved",
+    "asMassa" -> "Massaved",
+    "seam" -> "skarv",
     "prLong" -> "Lång serie 1995–",
     "capPrLong" -> "De två prisserierna hopfogade till 1995–2025. Skogsstyrelsen bytte regionindelning 2019, så den gamla tabellens tre regioner används genomgående — landsdelarna viks ihop till samma tre, volymvägt. Skarven är markerad. Överlappet 2019–2021 låter skarven kontrolleras: Nord skiljer 1,3 procent och Syd 0,8 procent, medan Mellan ligger 6,3 procent fel eftersom Skogsstyrelsens Mellan sträcker sig längre söderut än Svealand. Läs Mellan med den reservationen.",
     "s10h" -> "Handeln, och Ryssland",
@@ -24,8 +24,8 @@ object I18n:
     "capTrGoods" -> "Import per varugrupp. Rundvirke är den post som konkurrerar direkt med svensk avverkning.",
     "capTrExport" -> "Export per varugrupp. Sverige säljer förädlat — sågade trävaror, massa och papper — och köper råvara.",
     "axMsek" -> "milj. kr/år",
-    "s11h" -> "Vad virket betalar",
-    "s11p" -> "Volymvägda genomsnittspriser på leveransvirke. Sortimenten är i praktiken trädslag: tall- och gransågtimmer, björkmassaved.",
+    "s11h" -> "Vad virket får betalt",
+    "s11p" -> "Volymvägda genomsnittspriser på leveransvirke, uppdelat på de två marknaderna: sågtimmer per trädslag, och massaved per barr och löv. Skogsstyrelsen bytte namn på massavedssortimenten 2024, så de gamla och nya namnen är hopfogade — annars tar serien slut mitt i diagrammet. Massaved visas som totalt: uppdelningen på barr och löv per landsdel slutade publiceras efter 2023, och Götalands slutar redan 2022.",
     "prRegion" -> "Per landsdel",
     "prReal" -> "Realt 1967–",
     "capPrRegion" -> "Kronor per m³f ub och landsdel. Gradienten följer sågverkens geografi: Götaland betalar mest, Norra Norrland minst — samma riktning som boniteten, men av andra skäl.",
@@ -128,10 +128,10 @@ object I18n:
   )
 
   val en: Map[String, String] = Map(
-    "seam" -> "splice",
     "asTall" -> "Pine sawlogs",
     "asGran" -> "Spruce sawlogs",
-    "asBjork" -> "Birch pulpwood",
+    "asMassa" -> "Pulpwood",
+    "seam" -> "splice",
     "prLong" -> "Long series, 1995–",
     "capPrLong" -> "The two price tables spliced into one 1995–2025 series. Skogsstyrelsen changed its regioning in 2019, so the old table's three regions are used throughout and the landsdelar are folded back into them, volume-weighted. The seam is marked. The 2019–2021 overlap lets the seam be checked: Nord differs by 1.3% and Syd by 0.8%, while Mellan is 6.3% out because Skogsstyrelsen's Mellan reaches further south than Svealand. Read Mellan with that caveat.",
     "s10h" -> "Trade, and Russia",
@@ -143,8 +143,8 @@ object I18n:
     "capTrGoods" -> "Imports by commodity group. Roundwood is the line that competes directly with domestic felling.",
     "capTrExport" -> "Exports by commodity group. Sweden sells processed goods — sawn wood, pulp and paper — and buys raw material.",
     "axMsek" -> "million SEK/yr",
-    "s11h" -> "What the wood pays",
-    "s11p" -> "Volume-weighted average delivered-wood prices. The assortments are species in practice: pine and spruce sawlogs, birch pulpwood.",
+    "s11h" -> "What the wood fetches",
+    "s11p" -> "Volume-weighted average delivered-wood prices, split by the two markets: sawlogs by species, and pulpwood by softwood and hardwood. Skogsstyrelsen renamed the pulpwood assortments in 2024, so the old and new names are stitched together — otherwise the series stops mid-chart. Pulpwood is shown as a total: the softwood/hardwood split per region stopped being published after 2023, and Götaland's ends in 2022.",
     "prRegion" -> "By region",
     "prReal" -> "Real, 1967–",
     "capPrRegion" -> "Kronor per m³f ub by region. The gradient follows the geography of the sawmills: Götaland pays most, Norra Norrland least — the same direction as bonitet, for different reasons.",

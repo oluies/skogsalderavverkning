@@ -452,7 +452,7 @@ object App:
             div(cls := "seg",
               // the SQL values stay Swedish; the labels are translated, so the
               // controls do not sit in Swedish inside an English page
-              Queries.assortments.zip(Vector(K.asTall, K.asGran, K.asBjork)).map { (a, key) =>
+              Queries.assortments.zip(Vector(K.asTall, K.asGran, K.asMassa)).map { (a, key) =>
                 button(tpe := "button", child.text <-- t(key),
                   aria.pressed <-- prAssort.signal.map(x => (x == a).toString),
                   onClick.mapTo(a) --> prAssort)

@@ -8,8 +8,8 @@ package skog
   * a regex in verify.py to catch it.
   */
 object K:
-  val asBjork: String = "asBjork"
   val asGran: String = "asGran"
+  val asMassa: String = "asMassa"
   val asTall: String = "asTall"
   val axBon: String = "axBon"
   val axDays: String = "axDays"
