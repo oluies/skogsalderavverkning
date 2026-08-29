@@ -259,12 +259,16 @@ object Queries:
     */
   /** Assortment paired with its label key, so the two cannot drift apart the
     * way a positional zip against a Vector in another file can. */
-  val assortments: Vector[String] = assortmentLabels.map(_._1)
-
   val assortmentLabels: Vector[(String, String)] = Vector(
     "Tallsågtimmer"    -> K.asTall,
     "Gransågtimmer"    -> K.asGran,
     "Massaved, totalt" -> K.asMassa)
+
+  // Declared AFTER the Vector it reads. A forward reference between vals in a
+  // Scala object initialises to null, and the resulting NPE is swallowed by the
+  // Future that boot runs in - the page simply never mounts, with nothing in
+  // the console.
+  val assortments: Vector[String] = assortmentLabels.map(_._1)
 
   /** Roundwood price per landsdel for one assortment, kr/m3fub. */
   def pricesByRegion(assortment: String): Future[Vector[Series]] =

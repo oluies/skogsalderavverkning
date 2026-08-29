@@ -27,10 +27,17 @@ import org.scalajs.dom
   else
     SkogDb.ready.onComplete {
       case scala.util.Success(_) =>
-        val n = SkogDb.registerSwedenMap()
-        if n == 0 then dom.console.warn("no county geometry registered; maps will be blank")
-        Option(status).foreach(_.asInstanceOf[dom.html.Element].style.display = "none")
-        App.start()
+        // Anything thrown here would otherwise be swallowed by this Future and
+        // leave the page sitting on "Laddar..." with an empty console.
+        try
+          val n = SkogDb.registerSwedenMap()
+          if n == 0 then dom.console.warn("no county geometry registered; maps will be blank")
+          Option(status).foreach(_.asInstanceOf[dom.html.Element].style.display = "none")
+          App.start()
+        catch
+          case e: Throwable =>
+            fail(s"The page failed to start: ${e}")
+            throw e
       case scala.util.Failure(e) =>
         fail(s"DuckDB-WASM failed to start: ${e.getMessage}")
     }
