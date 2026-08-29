@@ -29,6 +29,9 @@ function over calendar years, not a JavaScript loop.
 | Precipitation (monthly sum) | SMHI metobs param 23 | 2169 stations |
 | Snow depth (daily) | SMHI metobs param 8 | 1897 stations |
 | Boundaries | Natural Earth 10m admin-1 | 21 counties |
+| Foreign trade in wood | SCB HA0201B (KN, by partner) | commodity × country, 1995–2025 |
+| Roundwood prices | Skogsstyrelsen, Rundvirkespriser | landsdel × assortment, 2019–2025 |
+| Roundwood prices, real | Skogsstyrelsen, Ekonomi tabell 4 | national, 1967/68–2022 |
 
 SLU's PxWeb API root is `https://skogsstatistik.slu.se/api/v1/sv/OffStat`
 (note: *not* under `/pxweb/`, which the browser URL suggests but which 404s). It
@@ -43,6 +46,8 @@ Runs from a clean checkout; every fetch step is idempotent and skips what it alr
 python3 scripts/fetch_slu.py                       # SLU tables + Natural Earth boundaries
 python3 scripts/fetch_smhi.py                      # temperature
 python3 scripts/fetch_smhi_precip_snow.py          # precipitation + snow
+python3 scripts/fetch_scb_trade.py                 # SCB wood import/export
+python3 scripts/fetch_skogsstyrelsen.py            # roundwood prices
 python3 scripts/flatten_jsonstat.py                # JSON-stat2 -> tidy CSV
 duckdb data/skog.duckdb < scripts/build.sql        # tables + spatial joins
 duckdb data/skog.duckdb < scripts/export_parquet.sql   # parquet for the browser
@@ -139,6 +144,9 @@ attribution when reused:
   (CC BY 4.0). <https://opendata.smhi.se>
 - **Natural Earth** 10m admin-1 boundaries — public domain.
   <https://www.naturalearthdata.com>
+- **SCB** (Statistics Sweden), foreign trade in goods. <https://www.scb.se>
+- **Skogsstyrelsen** (Swedish Forest Agency), roundwood prices.
+  <https://www.skogsstyrelsen.se>
 
 If you reuse the figures, cite SLU and SMHI rather than this repository. Note
 that the numbers here are *derived* — five-year means restated, anomalies

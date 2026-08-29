@@ -396,3 +396,78 @@ LEFT JOIN t ON t.area = cm.slu_name
 LEFT JOIN p ON p.area = cm.slu_name
 LEFT JOIN s ON s.area = cm.slu_name
 LEFT JOIN c ON c.area = cm.slu_name;
+
+-- ===========================================================================
+-- 9. Foreign trade in wood (SCB) and roundwood prices (Skogsstyrelsen)
+-- ===========================================================================
+-- SLU inventories the forest but publishes neither trade nor prices, so these
+-- come from the two agencies that do. Together they carry the demand side of
+-- the felling-age question: what the wood is worth, and where the competing
+-- supply went.
+
+CREATE OR REPLACE TABLE wood_trade AS
+WITH raw AS (
+  SELECT 'import' AS direction, "VarugruppKN" AS kn, "Handelspartner" AS partner,
+         CAST("Tid" AS INT) AS year, CAST(value AS DOUBLE) AS tkr
+  FROM read_csv('data/raw/scb_import_wood.csv', header=true, all_varchar=true)
+  WHERE value <> ''
+  UNION ALL
+  SELECT 'export', "VarugruppKN", "Handelspartner",
+         CAST("Tid" AS INT), CAST(value AS DOUBLE)
+  FROM read_csv('data/raw/scb_export_wood.csv', header=true, all_varchar=true)
+  WHERE value <> ''
+)
+-- The flattener writes JSON-stat *labels*, not codes, so match on the label
+-- text and give each group a short code and a short name of our own.
+SELECT direction,
+       CASE partner
+         WHEN 'Totalt' THEN 'TOT'  WHEN 'Ryssland' THEN 'RU'
+         WHEN 'Finland' THEN 'FI'  WHEN 'Estland'  THEN 'EE'
+         WHEN 'Lettland' THEN 'LV' WHEN 'Litauen'  THEN 'LT'
+         WHEN 'Norge' THEN 'NO'    WHEN 'Tyskland' THEN 'DE'
+         WHEN 'Belarus' THEN 'BY'  ELSE partner END AS partner,
+       year,
+       round(tkr / 1000.0, 1) AS msek,
+       CASE
+         WHEN kn LIKE 'Trä och varor av trä%'      THEN '44'
+         WHEN kn LIKE 'Brännved%'                  THEN '4401'
+         WHEN kn LIKE 'Virke, obearbetat%'         THEN '4403'
+         WHEN kn LIKE 'Virke, sågat%'              THEN '4407'
+         WHEN kn LIKE 'Massa av ved%'              THEN '47'
+         WHEN kn LIKE 'Papper och papp%'           THEN '48'
+         ELSE 'other' END AS kn,
+       CASE
+         WHEN kn LIKE 'Trä och varor av trä%'      THEN 'Trä totalt'
+         WHEN kn LIKE 'Brännved%'                  THEN 'Brännved och flis'
+         WHEN kn LIKE 'Virke, obearbetat%'         THEN 'Rundvirke'
+         WHEN kn LIKE 'Virke, sågat%'              THEN 'Sågade trävaror'
+         WHEN kn LIKE 'Massa av ved%'              THEN 'Massa'
+         WHEN kn LIKE 'Papper och papp%'           THEN 'Papper'
+         ELSE kn END AS kn_label
+FROM raw;
+
+-- Roundwood prices per assortment and landsdel, 2019 onward. "Sortiment" is
+-- per species for the sawlog and pulpwood grades that matter here
+-- (Tallsagtimmer, Gransagtimmer, Bjorkmassaved).
+CREATE OR REPLACE TABLE prices_region AS
+SELECT
+       -- Skogsstyrelsen spells the regions out; SLU abbreviates. Normalise to
+       -- SLU's spelling so a region keeps one colour across the whole page.
+       CASE "Landsdel" WHEN 'Norra Norrland' THEN 'N Norrland'
+                       WHEN 'Södra Norrland' THEN 'S Norrland'
+                       ELSE "Landsdel" END AS region,
+       "Sortiment" AS assortment,
+       CAST("År" AS INT) AS year, CAST(value AS DOUBLE) AS kr_m3fub
+FROM read_csv('data/raw/prices_region_2019_2025.csv', header=true, all_varchar=true)
+WHERE value <> '';
+
+-- The long view: national prices in 2022 money, back to 1967/68. The older
+-- regional table uses Nord/Mellan/Syd rather than the four landsdelar, so it is
+-- deliberately not glued onto prices_region - the regionings do not align.
+CREATE OR REPLACE TABLE prices_real AS
+SELECT "Sortiment" AS assortment,
+       -- labels run "1967/68" until the series switches to calendar years
+       CAST(substr("År", 1, 4) AS INT) AS year,
+       CAST(value AS DOUBLE) AS kr_m3fub_2022
+FROM read_csv('data/raw/prices_real_1967_2022.csv', header=true, all_varchar=true)
+WHERE value <> '';

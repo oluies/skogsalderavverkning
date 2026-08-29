@@ -68,7 +68,8 @@ object Charts:
       zeroBased: Boolean = true,
       decimals: Int = 0,
       showStorms: Boolean = false,
-      valueSuffix: String = ""
+      valueSuffix: String = "",
+      xStep: Int = 0
   ): js.Object =
     // "{value}" would render 2004 as "2,004"; years are plain integers.
     val yearFormatter: js.Function1[js.Any, String] = (v: js.Any) =>
@@ -99,8 +100,12 @@ object Charts:
       "xAxis" -> obj(
         "type" -> "value",
         "min" -> "dataMin", "max" -> "dataMax",
-        "axisLabel" -> obj("formatter" -> yearFormatter, "color" -> Theme.ink3,
-                           "fontFamily" -> "IBM Plex Mono, monospace", "fontSize" -> 11),
+        "axisLabel" -> (if xStep > 0
+          then obj("formatter" -> yearFormatter, "color" -> Theme.ink3,
+                   "fontFamily" -> "IBM Plex Mono, monospace", "fontSize" -> 11,
+                   "interval" -> (xStep - 1))
+          else obj("formatter" -> yearFormatter, "color" -> Theme.ink3,
+                   "fontFamily" -> "IBM Plex Mono, monospace", "fontSize" -> 11)),
         "axisLine" -> axisLine(Theme.rule2),
         "axisTick" -> obj("show" -> false),
         "splitLine" -> obj("show" -> false)
@@ -153,7 +158,8 @@ object Charts:
       diverging: Boolean,
       counts: Map[String, Double] = Map.empty,
       countsLabel: String = "",
-      noDataLabel: String = "–"
+      noDataLabel: String = "–",
+      metric: String = ""
   ): js.Object =
     val nums = values.values.toVector
     val (lo, hi) =
@@ -165,7 +171,7 @@ object Charts:
 
     val pieces =
       if diverging then
-        Vector(-1.0, -0.66, -0.33, 0.0, 0.33, 0.66, 1.0).map(t => Theme.diverging(t))
+        Vector(-1.0, -0.66, -0.33, 0.0, 0.33, 0.66, 1.0).map(t => Theme.diverging(t, metric))
       else Theme.seq
 
     val mapTooltip: js.Function1[js.Dynamic, String] = (p: js.Dynamic) =>
@@ -306,13 +312,14 @@ object Charts:
       label: String,
       unit: String,
       decimals: Int,
-      relativeTo: String
+      relativeTo: String,
+      metric: String
   ): js.Object =
     val vals = cells.map(_._3)
     // deviations, so the scale is symmetric around zero by construction
     val m = if vals.isEmpty then 1.0 else math.max(vals.map(math.abs).max, 1e-9)
     val (lo, hi) = (-m, m)
-    val ramp = Vector(-1.0, -0.5, 0.0, 0.5, 1.0).map(t => Theme.diverging(t))
+    val ramp = Vector(-1.0, -0.5, 0.0, 0.5, 1.0).map(t => Theme.diverging(t, metric))
 
     // The map's precision is tuned for levels: bonitet at one decimal is right
     // for values of 2-11, but these deviations span about +/-0.35, where one
@@ -402,7 +409,8 @@ object Charts:
       label: String,
       unit: String,
       decimals: Int,
-      diverging: Boolean
+      diverging: Boolean,
+      metric: String = ""
   ): js.Object =
     val sorted = values.toVector.sortBy(_._2)
     val nums = sorted.map(_._2)
@@ -412,7 +420,7 @@ object Charts:
         js.Dynamic.global.Number(p.value).asInstanceOf[Double], decimals)} $unit</b>"
     val barColor: js.Function1[js.Dynamic, String] = (p: js.Dynamic) =>
       val v = js.Dynamic.global.Number(p.value).asInstanceOf[Double]
-      if diverging then Theme.diverging(v / m)
+      if diverging then Theme.diverging(v / m, metric)
       else
         val seq = Theme.seq
         val lo = nums.min

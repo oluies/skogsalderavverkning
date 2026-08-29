@@ -55,7 +55,11 @@ def flatten(path, out):
     print(f"{path} -> {out}  dims={dims} sizes={sizes} cells={len(val)}")
 
 NAMES = ["fig49", "tab311a", "avv_tradslag_landsdel", "avv_huggningsarter",
-         "naturlig_avgang", "skadetyper", "bestandstyper"]
+         "naturlig_avgang", "skadetyper", "bestandstyper",
+         # SCB foreign trade and Skogsstyrelsen prices
+         "scb_import_wood", "scb_export_wood",
+         "prices_region_1995_2021", "prices_region_2019_2025",
+         "prices_real_1967_2022"]
 
 if __name__ == "__main__":
     import os

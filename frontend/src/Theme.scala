@@ -41,9 +41,22 @@ object Theme:
     val i = regions.indexOf(r)
     slot(if i >= 0 then i else 0)
 
+  /** Diverging poles chosen per metric, so the colour means what it looks like.
+    *
+    * Warmer-than-normal rendered blue - which is what a single fixed pair gave
+    * - reads backwards. Brown/green is ColorBrewer's BrBG axis and is listed
+    * colourblind-safe; green/red, the obvious choice for growth, is the classic
+    * red-green trap and is deliberately not used.
+    */
+  def poles(metric: String): (String, String) = metric match
+    case "warming"                => (cssVar("--dvBlue"),  cssVar("--dvRed"))    // cold / warm
+    case "precip" | "snow"        => (cssVar("--dvBrown"), cssVar("--dvBlue"))   // dry / wet
+    case _                        => (cssVar("--dvBrown"), cssVar("--dvGreen"))  // less / more growth
+
   /** Blend toward a pole for the diverging scale; t in [-1, 1]. */
-  def diverging(t: Double): String =
-    val c = if t >= 0 then pos else neg
+  def diverging(t: Double, metric: String = ""): String =
+    val (lo, hi) = poles(metric)
+    val c = if t >= 0 then hi else lo
     mix(panel, c, math.min(1.0, 0.18 + math.abs(t) * 0.82))
 
   def mix(base: String, over: String, a: Double): String =

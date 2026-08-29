@@ -18,6 +18,9 @@ object App:
   private val mapYear  = Var(2023)
   private val climView = Var("temp")
   private val spView   = Var("stand")
+  private val trView   = Var("partner")
+  private val prView   = Var("region")
+  private val prAssort = Var("Tallsågtimmer")
   private val weights  = Var(Map("bonitet" -> 1.0, "temp" -> 1.0, "precip" -> 1.0, "snow" -> 0.0))
   private val drivers  = Var(Vector.empty[Driver])
   private val themeTick = Var(0)   // bumped on theme change to force re-render
@@ -299,7 +302,7 @@ object App:
                 Queries.mapMetric(v, mapYear.now()).map { (vals, counts) =>
                   val (unitKey, dec, div_) = metricFormat(v)
                   Charts.choropleth(vals, tNow(metricLabel(v)), tNow(unitKey), dec, div_,
-                                    counts, tNow(K.tipStations), tNow(K.tipNoData))
+                                    counts, tNow(K.tipStations), tNow(K.tipNoData), v)
                 }
             ),
             // Beside the map: each county's deviation from its own mean over
@@ -315,10 +318,10 @@ object App:
                     case Some((areas, years, cells)) =>
                       Future.successful(Charts.heatmap(areas, years, cells,
                         tNow(metricLabel(v)), tNow(unitKey), dec,
-                        relativeTo = tNow(K.vsCountyMean)))
+                        relativeTo = tNow(K.vsCountyMean), metric = v))
                     case None =>
                       Queries.mapMetric(v, mapYear.now()).map { (vals, _) =>
-                        Charts.ranked(vals, tNow(metricLabel(v)), tNow(unitKey), dec, div_)
+                        Charts.ranked(vals, tNow(metricLabel(v)), tNow(unitKey), dec, div_, v)
                       }
                   }
               ),
@@ -412,6 +415,57 @@ object App:
           ),
           caption(lang.signal.combineWith(spView.signal).map { (_, v) =>
             tNow(if v == "stand" then K.capStand else K.capFell)
+          })
+        )
+      ),
+
+      section(K.s10h, K.s10p,
+        Some(segmented(trView, Vector(
+          "partner" -> K.trPartner, "goods" -> K.trGoods, "export" -> K.trExport))),
+        panel(
+          asyncChart(380,
+            trView.signal.combineWith(themeTick.signal).mapTo(()),
+            () =>
+              val f = trView.now() match
+                case "goods"  => Queries.tradeByGoods("import")
+                case "export" => Queries.tradeByGoods("export")
+                case _        => Queries.tradeByPartner("import")
+              f.map(sx => Charts.line(sx, tNow(K.axMsek), zeroBased = true, decimals = 0))
+          ),
+          caption(lang.signal.combineWith(trView.signal).map { (_, v) =>
+            tNow(v match
+              case "goods"  => K.capTrGoods
+              case "export" => K.capTrExport
+              case _        => K.capTrPartner)
+          })
+        )
+      ),
+
+      section(K.s11h, K.s11p,
+        Some(segmented(prView, Vector("region" -> K.prRegion, "real" -> K.prReal))),
+        panel(
+          div(cls := "ctrls",
+            display <-- prView.signal.map(v => if v == "region" then "flex" else "none"),
+            div(cls := "seg",
+              Queries.assortments.map { a =>
+                button(tpe := "button", a,
+                  aria.pressed <-- prAssort.signal.map(x => (x == a).toString),
+                  onClick.mapTo(a) --> prAssort)
+              }
+            )
+          ),
+          asyncChart(380,
+            prView.signal.combineWith(prAssort.signal).combineWith(themeTick.signal).mapTo(()),
+            () =>
+              if prView.now() == "region" then
+                Queries.pricesByRegion(prAssort.now()).map(sx =>
+                  Charts.line(sx, tNow(K.axKrM3), zeroBased = true, decimals = 0, xStep = 1))
+              else
+                Queries.pricesReal.map(sx =>
+                  Charts.line(sx, tNow(K.axKrM3), zeroBased = true, decimals = 0))
+          ),
+          caption(lang.signal.combineWith(prView.signal).map { (_, v) =>
+            tNow(if v == "region" then K.capPrRegion else K.capPrReal)
           })
         )
       ),

@@ -200,6 +200,77 @@ object Queries:
         k => Theme.slot(species.indexOf(k)))
     }
 
+  val tradePartners = Vector("Ryssland", "Finland", "Estland", "Lettland",
+                             "Litauen", "Norge", "Tyskland")
+  private val partnerCode = Map(
+    "Ryssland" -> "RU", "Finland" -> "FI", "Estland" -> "EE", "Lettland" -> "LV",
+    "Litauen" -> "LT", "Norge" -> "NO", "Tyskland" -> "DE")
+
+  /** Wood imports by partner country, MSEK per year.
+    *
+    * Russia is the reason this is here: roundwood came from there until the EU
+    * banned it in 2022, and the series shows both that and the earlier decline.
+    */
+  def tradeByPartner(direction: String): Future[Vector[Series]] =
+    val codes = tradePartners.flatMap(partnerCode.get).map(c => s"'$c'").mkString(",")
+    SkogDb.query(
+      s"""SELECT partner, year, msek FROM wood_trade
+          WHERE direction = '$direction' AND kn = '44' AND partner IN ($codes)
+          ORDER BY partner, year"""
+    ).map { rows =>
+      val byCode = partnerCode.map(_.swap)
+      val named = rows.toVector.map { r =>
+        (byCode.getOrElse(Decode.str(r, "partner"), Decode.str(r, "partner")),
+         Decode.opt(r, "year"), Decode.opt(r, "msek"))
+      }
+      tradePartners.zipWithIndex.flatMap { (name, i) =>
+        val pts = named.collect {
+          case (n, Some(y), Some(v)) if n == name => Pt(y, v)
+        }.sortBy(_.x)
+        if pts.isEmpty then None else Some(Series(name, Theme.slot(i), pts))
+      }
+    }
+
+  /** Imports and exports of the main wood commodity groups, MSEK per year. */
+  def tradeByGoods(direction: String): Future[Vector[Series]] =
+    val groups = Vector("4403", "4407", "47", "48")
+    SkogDb.query(
+      s"""SELECT kn, kn_label, year, msek FROM wood_trade
+          WHERE direction = '$direction' AND partner = 'TOT'
+            AND kn IN (${groups.map(g => s"'$g'").mkString(",")})
+          ORDER BY kn, year"""
+    ).map { rows =>
+      val recs = rows.toVector.map(r =>
+        (Decode.str(r, "kn"), Decode.str(r, "kn_label"),
+         Decode.opt(r, "year"), Decode.opt(r, "msek")))
+      groups.zipWithIndex.flatMap { (g, i) =>
+        val label = recs.find(_._1 == g).map(_._2).getOrElse(g)
+        val pts = recs.collect { case (k, _, Some(y), Some(v)) if k == g => Pt(y, v) }
+          .sortBy(_.x)
+        if pts.isEmpty then None else Some(Series(label, Theme.slot(i), pts))
+      }
+    }
+
+  val assortments = Vector("Tallsågtimmer", "Gransågtimmer", "Björkmassaved")
+
+  /** Roundwood price per landsdel for one assortment, kr/m3fub. */
+  def pricesByRegion(assortment: String): Future[Vector[Series]] =
+    SkogDb.query(
+      s"""SELECT region, year, kr_m3fub FROM prices_region
+          WHERE assortment = '$assortment' AND region <> 'Hela landet'
+          ORDER BY region, year"""
+    ).map(grouped(_, "region", "year", "kr_m3fub", Theme.regions, regionColor))
+
+  /** National prices in 2022 money, back to 1967. */
+  def pricesReal: Future[Vector[Series]] =
+    SkogDb.query(
+      """SELECT assortment, year, kr_m3fub_2022 FROM prices_real
+         ORDER BY assortment, year"""
+    ).map { rows =>
+      grouped(rows, "assortment", "year", "kr_m3fub_2022", assortments,
+        k => Theme.slot(assortments.indexOf(k)))
+    }
+
   /** Figures quoted in prose, keyed by name. */
   def meta: Future[Map[String, Double]] =
     SkogDb.query("SELECT k, v FROM meta").map { rows =>

@@ -57,3 +57,10 @@ COPY (SELECT slu_name, landsdel, iso,
              ST_AsGeoJSON(ST_SimplifyPreserveTopology(geom, 0.02)) AS gj
       FROM counties ORDER BY slu_name)
   TO 'site/data/counties.json' (FORMAT JSON, ARRAY true);
+
+COPY (SELECT direction, kn, kn_label, partner, year, msek FROM wood_trade)
+  TO 'site/data/wood_trade.parquet' (FORMAT parquet, COMPRESSION zstd);
+COPY (SELECT region, assortment, year, kr_m3fub FROM prices_region)
+  TO 'site/data/prices_region.parquet' (FORMAT parquet, COMPRESSION zstd);
+COPY (SELECT assortment, year, kr_m3fub_2022 FROM prices_real)
+  TO 'site/data/prices_real.parquet' (FORMAT parquet, COMPRESSION zstd);
