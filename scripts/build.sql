@@ -472,9 +472,18 @@ FROM read_csv('data/raw/volumes_region_2019_2025.csv', header=true, all_varchar=
 WHERE value <> ''
 GROUP BY 1, 2, 3;
 
+-- Volumes are published only to 2024, and the 2024 cells are blank for the
+-- assortments the page plots, so a year-matched join left the recent years
+-- unweighted - the weighting silently did nothing exactly where the prices move
+-- most. Weights are the most recent year each region and assortment has, which
+-- is a share-of-volume that changes slowly, not a price.
+CREATE OR REPLACE TABLE latest_volumes AS
+SELECT region, assortment, m3fub FROM volumes_region
+QUALIFY row_number() OVER (PARTITION BY region, assortment ORDER BY year DESC) = 1;
+
 -- Roundwood prices per assortment and landsdel, 2019 onward. "Sortiment" is
--- per species for the sawlog and pulpwood grades that matter here
--- (Tallsagtimmer, Gransagtimmer, Bjorkmassaved).
+-- per species for the sawlog grades
+-- (Tallsagtimmer, Gransagtimmer, and the pulpwood grades).
 CREATE OR REPLACE TABLE prices_region AS
 SELECT
        -- Skogsstyrelsen spells the regions out; SLU abbreviates. Normalise to
@@ -512,9 +521,12 @@ SELECT assortment, year, kr_m3fub_2022 FROM (
 -- Mellan / Syd, the current one (2019-) reports the four landsdelar. The three
 -- overlap years let the mapping be checked rather than assumed:
 --
---   Nord   vs N+S Norrland   agree within about 2%
---   Syd    vs Gotaland       agree within about 1.5%
---   Mellan vs Svealand       old runs about 9% HIGH
+--   Nord   vs N+S Norrland   agree closely
+--   Syd    vs Gotaland       agree closely
+--   Mellan vs Svealand       old runs materially high
+--
+-- The exact percentages are not repeated here: prices_splice_check computes
+-- them, and a hand-copied number in a comment is what went stale twice.
 --
 -- So Skogsstyrelsen's Mellan is not Svealand - it reaches further south. Nord
 -- and Syd splice cleanly; Mellan is carried but flagged, and the seam year is
@@ -522,7 +534,7 @@ SELECT assortment, year, kr_m3fub_2022 FROM (
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE TABLE prices_long AS
 WITH old AS (
-  SELECT "Region" AS region3, "Sortiment" AS assortment,
+  SELECT "Region" AS region3, canon_assortment("Sortiment") AS assortment,
          CAST("År" AS INT) AS year, CAST(value AS DOUBLE) AS kr
   FROM read_csv('data/raw/prices_region_1995_2021.csv', header=true, all_varchar=true)
   WHERE value <> '' AND "Region" <> 'Hela landet'
@@ -537,8 +549,8 @@ WITH old AS (
          p.assortment, p.year,
          sum(p.kr_m3fub * coalesce(v.m3fub, 1)) / sum(coalesce(v.m3fub, 1)) AS kr
   FROM prices_region p
-  LEFT JOIN volumes_region v
-    ON v.region = p.region AND v.assortment = p.assortment AND v.year = p.year
+  LEFT JOIN latest_volumes v
+    ON v.region = p.region AND v.assortment = p.assortment
   WHERE p.region <> 'Hela landet'
   GROUP BY 1, 2, 3
 )
@@ -552,7 +564,7 @@ FROM new3 WHERE year >= 2022 AND region3 IS NOT NULL;
 -- than the reader having to trust it.
 CREATE OR REPLACE TABLE prices_splice_check AS
 WITH old AS (
-  SELECT "Region" AS region3, "Sortiment" AS assortment,
+  SELECT "Region" AS region3, canon_assortment("Sortiment") AS assortment,
          CAST("År" AS INT) AS year, CAST(value AS DOUBLE) AS kr
   FROM read_csv('data/raw/prices_region_1995_2021.csv', header=true, all_varchar=true)
   WHERE value <> '' AND "Region" <> 'Hela landet'
@@ -563,8 +575,8 @@ WITH old AS (
          p.assortment, p.year,
          sum(p.kr_m3fub * coalesce(v.m3fub, 1)) / sum(coalesce(v.m3fub, 1)) AS kr
   FROM prices_region p
-  LEFT JOIN volumes_region v
-    ON v.region = p.region AND v.assortment = p.assortment AND v.year = p.year
+  LEFT JOIN latest_volumes v
+    ON v.region = p.region AND v.assortment = p.assortment
   WHERE p.region <> 'Hela landet' GROUP BY 1,2,3
 )
 SELECT o.region3,
@@ -591,7 +603,7 @@ SELECT CAST("År" AS INT) AS year,
        CASE WHEN "Tabellinnehåll" LIKE 'Areal%' THEN 'ha' ELSE 'antal' END AS measure,
        CAST(value AS DOUBLE) AS v
 FROM read_csv('data/raw/notifications_year.csv', header=true, all_varchar=true)
-WHERE value <> '';
+WHERE value <> '' AND "År" NOT LIKE 'Summa%';
 
 -- Felling actually refused, in montane forest. The series starts in 2020, when
 -- a Supreme Court ruling established the right to compensation for a refusal.
@@ -605,7 +617,10 @@ SELECT CAST("År" AS INT) AS year,
          ELSE 'landareal' END AS measure,
        CAST(value AS DOUBLE) AS v
 FROM read_csv('data/raw/denied_fjallnara.csv', header=true, all_varchar=true)
-WHERE value <> '' AND "År" NOT LIKE 'Summa%';
+-- one compensation type today, but nothing guarantees that stays true, and a
+-- second would silently double every (county, measure, year)
+WHERE value <> '' AND "År" NOT LIKE 'Summa%'
+  AND "Typ av ersättning" = 'Intrångsersättning för nekad avverkning i fjällnära skog';
 
 -- New habitat-protection orders per year: forest taken out of production.
 CREATE OR REPLACE TABLE protection AS

@@ -61,6 +61,7 @@ object K:
   val footerSource: String = "footerSource"
   val idxCap: String = "idxCap"
   val idxRank: String = "idxRank"
+  val lblHa: String = "lblHa"
   val lsaExcl: String = "lsaExcl"
   val lsaIncl: String = "lsaIncl"
   val mAge: String = "mAge"

@@ -259,6 +259,13 @@ object Queries:
     */
   val assortments = Vector("Tallsågtimmer", "Gransågtimmer", "Massaved, totalt")
 
+  /** Assortment paired with its label key, so the two cannot drift apart the
+    * way a positional zip against a Vector in another file can. */
+  val assortmentLabels: Vector[(String, String)] = Vector(
+    "Tallsågtimmer"    -> K.asTall,
+    "Gransågtimmer"    -> K.asGran,
+    "Massaved, totalt" -> K.asMassa)
+
   /** Roundwood price per landsdel for one assortment, kr/m3fub. */
   def pricesByRegion(assortment: String): Future[Vector[Series]] =
     SkogDb.query(
@@ -286,14 +293,20 @@ object Queries:
         k => Theme.slot(hue.getOrElse(k, 0)))
     }
 
+  /** The real series carries its own assortments: it ends in 2022, before the
+    * rename, and has no pulpwood total at all - so it cannot use `assortments`.
+    */
+  val realAssortments = Vector("Tallsågtimmer", "Gransågtimmer",
+                               "Massaved, barr", "Massaved, löv")
+
   /** National prices in 2022 money, back to 1967. */
   def pricesReal: Future[Vector[Series]] =
     SkogDb.query(
       """SELECT assortment, year, kr_m3fub_2022 FROM prices_real
          ORDER BY assortment, year"""
     ).map { rows =>
-      grouped(rows, "assortment", "year", "kr_m3fub_2022", assortments,
-        k => Theme.slot(assortments.indexOf(k)))
+      grouped(rows, "assortment", "year", "kr_m3fub_2022", realAssortments,
+        k => Theme.slot(realAssortments.indexOf(k)))
     }
 
   /** Notified felling area nationally, the forward-looking series.
@@ -304,18 +317,25 @@ object Queries:
     * owners specifically.
     */
   def notifications: Future[Vector[Series]] =
-    val groups = Vector("Enskilda ägare", "Övriga")
+    // the total is plotted as well: it is the figure the caption quotes, and
+    // leaving it out meant describing a line that was not on the chart
+    val groups = Vector("Samtliga", "Enskilda ägare", "Övriga")
     SkogDb.query(
       """SELECT owner_group, year, v FROM notifications
          WHERE region = 'Hela landet' AND measure = 'ha'
-           AND owner_group <> 'Samtliga' ORDER BY owner_group, year"""
+         ORDER BY owner_group, year"""
     ).map { rows =>
       grouped(rows, "owner_group", "year", "v", groups,
         k => Theme.slot(groups.indexOf(k)))
     }
 
-  /** Felling refused in montane forest: how many, and what it cost. */
-  def deniedFelling: Future[Vector[Series]] =
+  /** Felling refused in montane forest, in hectares.
+    *
+    * Area only: the case count runs 5-188 while the area runs 53-8250, and on
+    * one linear axis the count line sits flat on the baseline. The count is in
+    * the caption instead, where it can be read.
+    */
+  def deniedFelling(areaLabel: String): Future[Vector[Series]] =
     SkogDb.query(
       """SELECT year, measure, v FROM denied_felling WHERE county = 'Hela Landet'
          ORDER BY year"""
@@ -324,24 +344,32 @@ object Queries:
         (Decode.str(r, "measure"), Decode.opt(r, "year"), Decode.opt(r, "v")))
       def pick(m: String, scale: Double) =
         recs.collect { case (k, Some(y), Some(v)) if k == m => Pt(y, v * scale) }.sortBy(_.x)
-      Vector(
-        Series("Antal", Theme.slot(1), pick("antal", 1.0)),
-        Series("Hektar", Theme.slot(3), pick("ha", 1.0))
-      ).filter(_.data.nonEmpty)
+      Vector(Series(areaLabel, Theme.slot(3), pick("ha", 1.0))).filter(_.data.nonEmpty)
     }
 
   /** New habitat-protection orders per year: forest taken out of production. */
-  def protection: Future[Vector[Series]] =
+  def protection(areaLabel: String): Future[Vector[Series]] =
     SkogDb.query(
       """SELECT year, measure, v FROM protection WHERE region = 'Hela landet'
          ORDER BY year"""
     ).map { rows =>
       val recs = rows.toVector.map(r =>
         (Decode.str(r, "measure"), Decode.opt(r, "year"), Decode.opt(r, "v")))
-      Vector(Series("Hektar", Theme.slot(3),
+      Vector(Series(areaLabel, Theme.slot(3),
         recs.collect { case ("ha", Some(y), Some(v)) => Pt(y, v) }.sortBy(_.x)))
         .filter(_.data.nonEmpty)
     }
+
+  /** Measured agreement between the two price tables in their overlap.
+    *
+    * Read from the data rather than written into the caption: these numbers
+    * have gone stale twice already, once for each time the weighting changed.
+    */
+  def spliceCheck: Future[Vector[(String, Double)]] =
+    SkogDb.query("SELECT region3, pct_diff FROM prices_splice_check ORDER BY region3")
+      .map(_.toVector.flatMap { r =>
+        Decode.opt(r, "pct_diff").map(v => Decode.str(r, "region3") -> v)
+      })
 
   /** Figures quoted in prose, keyed by name. */
   def meta: Future[Map[String, Double]] =

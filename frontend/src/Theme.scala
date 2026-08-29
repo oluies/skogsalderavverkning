@@ -19,7 +19,6 @@ object Theme:
   def rule      = cssVar("--rule")
   def rule2     = cssVar("--rule-2")
   def panel     = cssVar("--panel")
-  def panel2    = cssVar("--panel-2")
 
   /** Fill for a county with no value. Distinct from the sequential ramp's
     * lightest step, which is close enough to the panel to be mistaken for it. */

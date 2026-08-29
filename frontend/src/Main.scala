@@ -22,6 +22,7 @@ object App:
   private val prView   = Var("region")
   private val prAssort = Var("Tallsågtimmer")
   private val rgView   = Var("notif")
+  private val splice   = Var("")
   private val weights  = Var(Map("bonitet" -> 1.0, "temp" -> 1.0, "precip" -> 1.0, "snow" -> 0.0))
   private val drivers  = Var(Vector.empty[Driver])
   private val themeTick = Var(0)   // bumped on theme change to force re-render
@@ -453,7 +454,7 @@ object App:
             div(cls := "seg",
               // the SQL values stay Swedish; the labels are translated, so the
               // controls do not sit in Swedish inside an English page
-              Queries.assortments.zip(Vector(K.asTall, K.asGran, K.asMassa)).map { (a, key) =>
+              Queries.assortmentLabels.map { (a, key) =>
                 button(tpe := "button", child.text <-- t(key),
                   aria.pressed <-- prAssort.signal.map(x => (x == a).toString),
                   onClick.mapTo(a) --> prAssort)
@@ -461,7 +462,8 @@ object App:
             )
           ),
           asyncChart(380,
-            prView.signal.combineWith(prAssort.signal).combineWith(themeTick.signal).mapTo(()),
+            prView.signal.combineWith(prAssort.signal).combineWith(lang.signal)
+              .combineWith(themeTick.signal).mapTo(()),
             () =>
               prView.now() match
                 case "region" =>
@@ -477,11 +479,13 @@ object App:
                   Queries.pricesReal.map(sx =>
                     Charts.line(sx, tNow(K.axKrM3), zeroBased = true, decimals = 0))
           ),
-          caption(lang.signal.combineWith(prView.signal).map { (_, v) =>
-            tNow(v match
+          caption(lang.signal.combineWith(prView.signal)
+            .combineWith(splice.signal).map { (_, v, _) =>
+            val base = tNow(v match
               case "region" => K.capPrRegion
               case "long"   => K.capPrLong
               case _        => K.capPrReal)
+            base.replace("{splice}", splice.now())
           })
         )
       ),
@@ -491,12 +495,12 @@ object App:
           "notif" -> K.rgNotif, "denied" -> K.rgDenied, "prot" -> K.rgProt))),
         panel(
           asyncChart(380,
-            rgView.signal.combineWith(themeTick.signal).mapTo(()),
+            rgView.signal.combineWith(lang.signal).combineWith(themeTick.signal).mapTo(()),
             () =>
               val axis = if rgView.now() == "denied" then K.axCount else K.axHa
               val f = rgView.now() match
-                case "denied" => Queries.deniedFelling
-                case "prot"   => Queries.protection
+                case "denied" => Queries.deniedFelling(tNow(K.lblHa))
+                case "prot"   => Queries.protection(tNow(K.lblHa))
                 case _        => Queries.notifications
               f.map(sx => Charts.line(sx, tNow(axis), zeroBased = true, decimals = 0))
           ),
@@ -647,6 +651,9 @@ object App:
       case Failure(e) =>
         // otherwise the page quietly renders "SMHI, — stationer" with no clue why
         dom.console.error(s"meta query failed: ${e.getMessage}")
+    }
+    Queries.spliceCheck.foreach { rows =>
+      splice.set(rows.map { (r, pct) => f"$r ${pct}%.1f %%" }.mkString(", "))
     }
     Queries.drivers.onComplete {
       case Success(d) => drivers.set(d)
