@@ -41,7 +41,7 @@ def post(table, body, tries=6):
     raise RuntimeError(f"{table}: {last}")
 
 
-def query(table, contents):
+def query(contents):
     return {
         "query": [
             {"code": "VarugruppKN", "selection":
@@ -58,7 +58,7 @@ def query(table, contents):
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    # D8/D2 are the value series (tkr) for import/export respectively
+    # the value series (tkr): D8 for imports, C5 for exports
     for name, table, contents in [
         ("scb_import_wood", "ImpTotalKNAr", "HA0201D8"),
         ("scb_export_wood", "ExpTotalKNAr", "HA0201C5"),
@@ -68,8 +68,9 @@ if __name__ == "__main__":
             print(f"  {name}: already present, skipping")
             continue
         print(f"  fetching {name} ...", flush=True)
-        d = post(table, query(table, contents))
-        json.dump(d, open(dest, "w"), ensure_ascii=False)
+        d = post(table, query(contents))
+        with open(dest, "w") as fh:
+            json.dump(d, fh, ensure_ascii=False)
         print(f"    -> {dest} ({len(d.get('value', []))} cells)")
         time.sleep(3)
     print("done")

@@ -9,14 +9,18 @@ package skog
 object I18n:
 
   val sv: Map[String, String] = Map(
+    "seam" -> "skarv",
+    "asTall" -> "Tallsågtimmer",
+    "asGran" -> "Gransågtimmer",
+    "asBjork" -> "Björkmassaved",
     "prLong" -> "Lång serie 1995–",
-    "capPrLong" -> "De två prisserierna hopfogade till 1995–2025. Skogsstyrelsen bytte regionindelning 2019, så den gamla tabellens tre regioner används genomgående — landsdelarna viks ihop till samma tre. Överlappet 2019–2021 låter skarven kontrolleras: Nord skiljer 1,6 procent och Syd 0,8 procent, medan Mellan ligger 6,3 procent fel eftersom Skogsstyrelsens Mellan sträcker sig längre söderut än Svealand. Läs Mellan med den reservationen.",
+    "capPrLong" -> "De två prisserierna hopfogade till 1995–2025. Skogsstyrelsen bytte regionindelning 2019, så den gamla tabellens tre regioner används genomgående — landsdelarna viks ihop till samma tre, volymvägt. Skarven är markerad. Överlappet 2019–2021 låter skarven kontrolleras: Nord skiljer 1,3 procent och Syd 0,8 procent, medan Mellan ligger 6,3 procent fel eftersom Skogsstyrelsens Mellan sträcker sig längre söderut än Svealand. Läs Mellan med den reservationen.",
     "s10h" -> "Handeln, och Ryssland",
-    "s10p" -> "SLU mäter skogen men redovisar varken handel eller priser. Utrikeshandeln kommer från SCB, prisen från Skogsstyrelsen — tillsammans är de efterfrågesidan av samma fråga.",
+    "s10p" -> "SLU mäter skogen men redovisar varken handel eller priser. Utrikeshandeln kommer från SCB, priserna från Skogsstyrelsen — tillsammans är de efterfrågesidan av samma fråga.",
     "trPartner" -> "Import per land",
     "trGoods" -> "Import per varugrupp",
     "trExport" -> "Export per varugrupp",
-    "capTrPartner" -> "Träimport i miljoner kronor per år och avsändningsland. Annekteringen 2014 syns inte: den ryska importen pendlar mellan 540 och 970 milj. kr ända fram till 2021, med sin topp 2019. Brottet kommer först 2022 och är totalt — EU:s sanktioner förbjöd rysk träimport, och från 2023 är den exakt noll. Norge har tagit över: från 4,3 till 8,4 miljarder kronor mellan 2021 och 2025.",
+    "capTrPartner" -> "Träimport i miljoner kronor per år och avsändningsland. Den ryska importen toppar redan 2000 på 1 599 milj. kr och ligger kvar över en miljard till 2008 — snitt 1 251. Efter 2008 halveras den till i snitt 720 och stannar där; Rysslands egna exporttullar på rundvirke från 2007 och finanskrisen bryter serien långt före kriget. Annekteringen 2014 syns inte alls. Brottet 2022 är däremot totalt: EU:s sanktioner förbjöd rysk träimport och från 2023 är den exakt noll. Norge har tagit över, från 4,3 till 8,4 miljarder kronor mellan 2021 och 2025.",
     "capTrGoods" -> "Import per varugrupp. Rundvirke är den post som konkurrerar direkt med svensk avverkning.",
     "capTrExport" -> "Export per varugrupp. Sverige säljer förädlat — sågade trävaror, massa och papper — och köper råvara.",
     "axMsek" -> "milj. kr/år",
@@ -124,14 +128,18 @@ object I18n:
   )
 
   val en: Map[String, String] = Map(
+    "seam" -> "splice",
+    "asTall" -> "Pine sawlogs",
+    "asGran" -> "Spruce sawlogs",
+    "asBjork" -> "Birch pulpwood",
     "prLong" -> "Long series, 1995–",
-    "capPrLong" -> "The two price tables spliced into one 1995–2025 series. Skogsstyrelsen changed its regioning in 2019, so the old table's three regions are used throughout and the landsdelar are folded back into them. The 2019–2021 overlap lets the seam be checked: Nord differs by 1.6% and Syd by 0.8%, while Mellan is 6.3% out because Skogsstyrelsen's Mellan reaches further south than Svealand. Read Mellan with that caveat.",
+    "capPrLong" -> "The two price tables spliced into one 1995–2025 series. Skogsstyrelsen changed its regioning in 2019, so the old table's three regions are used throughout and the landsdelar are folded back into them, volume-weighted. The seam is marked. The 2019–2021 overlap lets the seam be checked: Nord differs by 1.3% and Syd by 0.8%, while Mellan is 6.3% out because Skogsstyrelsen's Mellan reaches further south than Svealand. Read Mellan with that caveat.",
     "s10h" -> "Trade, and Russia",
     "s10p" -> "SLU measures the forest but publishes neither trade nor prices. Foreign trade comes from SCB, prices from Skogsstyrelsen — together they are the demand side of the same question.",
     "trPartner" -> "Imports by country",
     "trGoods" -> "Imports by commodity",
     "trExport" -> "Exports by commodity",
-    "capTrPartner" -> "Wood imports in million SEK per year by country of dispatch. The 2014 annexation leaves no mark: Russian imports swing between 540 and 970 million SEK right through 2021, peaking in 2019. The break comes only in 2022, and it is total — EU sanctions banned Russian wood, and from 2023 it is exactly zero. Norway took over, going from 4.3 to 8.4 billion SEK between 2021 and 2025.",
+    "capTrPartner" -> "Wood imports in million SEK per year by country of dispatch. Russian imports peak as early as 2000 at 1,599 million SEK and stay above a billion until 2008, averaging 1,251. After 2008 they halve to an average of 720 and stay there: Russia's own roundwood export tariffs from 2007 and the financial crisis break the series long before the war. The 2014 annexation leaves no mark at all. The 2022 break, by contrast, is total — EU sanctions banned Russian wood and from 2023 it is exactly zero. Norway took over, going from 4.3 to 8.4 billion SEK between 2021 and 2025.",
     "capTrGoods" -> "Imports by commodity group. Roundwood is the line that competes directly with domestic felling.",
     "capTrExport" -> "Exports by commodity group. Sweden sells processed goods — sawn wood, pulp and paper — and buys raw material.",
     "axMsek" -> "million SEK/yr",

@@ -67,3 +67,6 @@ COPY (SELECT assortment, year, kr_m3fub_2022 FROM prices_real)
 
 COPY (SELECT region3, assortment, year, kr_m3fub, src FROM prices_long)
   TO 'site/data/prices_long.parquet' (FORMAT parquet, COMPRESSION zstd);
+
+COPY (SELECT region3, pct_diff, n_pairs FROM prices_splice_check)
+  TO 'site/data/prices_splice_check.parquet' (FORMAT parquet, COMPRESSION zstd);

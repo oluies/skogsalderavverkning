@@ -24,8 +24,12 @@ object Charts:
     */
   private def signed(v: Double, decimals: Int): String =
     val t = fixed(v, decimals)
-    val z = if t.matches("-0(\\.0+)?") then t.drop(1) else t
-    if z.startsWith("-") then z else "+" + z
+    // A value that rounds to zero is neither an increase nor a decrease, so it
+    // gets no sign at all. Stripping the "-" and adding "+" would just swap one
+    // false claim for the other.
+    if t.matches("[+-]?0(\\.0+)?") then t.replace("-", "")
+    else if t.startsWith("-") then t
+    else "+" + t
 
   private def textStyle(color: String, size: Int = 11) =
     obj("color" -> color, "fontFamily" -> "IBM Plex Mono, ui-monospace, monospace",
@@ -43,14 +47,16 @@ object Charts:
   private val storms = Vector(2005 -> "Gudrun", 2007 -> "Per",
                               2011 -> "Dagmar", 2013 -> "Ivar")
 
-  private def stormMarks(): js.Object =
+  private def stormMarks(): js.Object = marksFor(storms)
+
+  private def marksFor(items: Vector[(Int, String)]): js.Object =
     obj(
       "silent" -> true,
       "symbol" -> "none",
       "label" -> obj("show" -> true, "position" -> "insideEndTop",
                      "color" -> Theme.ink3, "fontSize" -> 10),
       "lineStyle" -> obj("color" -> Theme.ink3, "type" -> "dashed", "width" -> 1),
-      "data" -> storms.map { case (x, name) =>
+      "data" -> items.map { case (x, name) =>
         obj("xAxis" -> x, "name" -> name,
             "label" -> obj("formatter" -> name)): js.Any
       }.toJSArray
@@ -69,7 +75,8 @@ object Charts:
       decimals: Int = 0,
       showStorms: Boolean = false,
       valueSuffix: String = "",
-      xStep: Int = 0
+      xStep: Int = 0,
+      marks: Vector[(Int, String)] = Vector.empty
   ): js.Object =
     // "{value}" would render 2004 as "2,004"; years are plain integers.
     val yearFormatter: js.Function1[js.Any, String] = (v: js.Any) =>
@@ -100,12 +107,11 @@ object Charts:
       "xAxis" -> obj(
         "type" -> "value",
         "min" -> "dataMin", "max" -> "dataMax",
-        "axisLabel" -> (if xStep > 0
-          then obj("formatter" -> yearFormatter, "color" -> Theme.ink3,
-                   "fontFamily" -> "IBM Plex Mono, monospace", "fontSize" -> 11,
-                   "interval" -> (xStep - 1))
-          else obj("formatter" -> yearFormatter, "color" -> Theme.ink3,
-                   "fontFamily" -> "IBM Plex Mono, monospace", "fontSize" -> 11)),
+        // axisLabel.interval is a category-axis option and does nothing here;
+        // on a value axis label density comes from the axis interval itself.
+        "interval" -> (if xStep > 0 then (xStep: js.Any) else (js.undefined: js.Any)),
+        "axisLabel" -> obj("formatter" -> yearFormatter, "color" -> Theme.ink3,
+                           "fontFamily" -> "IBM Plex Mono, monospace", "fontSize" -> 11),
         "axisLine" -> axisLine(Theme.rule2),
         "axisTick" -> obj("show" -> false),
         "splitLine" -> obj("show" -> false)
@@ -145,6 +151,7 @@ object Charts:
           "data" -> s.data.map(p => js.Array[js.Any](p.x, p.y): js.Any).toJSArray
         )
         if showStorms && i == 0 then base("markLine") = stormMarks()
+        else if marks.nonEmpty && i == 0 then base("markLine") = marksFor(marks)
         base.asInstanceOf[js.Object]: js.Any
       }.toJSArray
     )
@@ -218,7 +225,7 @@ object Charts:
         "top" -> 10, "bottom" -> 46,
         "label" -> obj("show" -> false),
         "itemStyle" -> obj("borderColor" -> Theme.panel, "borderWidth" -> 0.8,
-                           "areaColor" -> Theme.panel2),
+                           "areaColor" -> Theme.noData),
         "emphasis" -> obj(
           "label" -> obj("show" -> false),
           "itemStyle" -> obj("borderColor" -> Theme.ink, "borderWidth" -> 1.6)
@@ -379,8 +386,9 @@ object Charts:
         "min" -> lo, "max" -> hi,
         "calculable" -> false, "show" -> true,
         "orient" -> "horizontal",
-        "left" -> "center", "bottom" -> 0,
+        "left" -> "center",
         "itemWidth" -> 11, "itemHeight" -> 90,
+        "bottom" -> 16,
         "text" -> js.Array(signed(hi, dec), signed(lo, dec)),
         "textStyle" -> obj("color" -> Theme.ink3, "fontSize" -> 10.5,
                            "fontFamily" -> "IBM Plex Mono, monospace"),

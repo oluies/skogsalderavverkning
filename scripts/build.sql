@@ -420,31 +420,40 @@ WITH raw AS (
 -- The flattener writes JSON-stat *labels*, not codes, so match on the label
 -- text and give each group a short code and a short name of our own.
 SELECT direction,
-       CASE partner
+       CASE raw.partner
          WHEN 'Totalt' THEN 'TOT'  WHEN 'Ryssland' THEN 'RU'
          WHEN 'Finland' THEN 'FI'  WHEN 'Estland'  THEN 'EE'
          WHEN 'Lettland' THEN 'LV' WHEN 'Litauen'  THEN 'LT'
          WHEN 'Norge' THEN 'NO'    WHEN 'Tyskland' THEN 'DE'
-         WHEN 'Belarus' THEN 'BY'  ELSE partner END AS partner,
+         WHEN 'Belarus' THEN 'BY'  ELSE raw.partner END AS partner,
        year,
        round(tkr / 1000.0, 1) AS msek,
        CASE
-         WHEN kn LIKE 'Trä och varor av trä%'      THEN '44'
-         WHEN kn LIKE 'Brännved%'                  THEN '4401'
-         WHEN kn LIKE 'Virke, obearbetat%'         THEN '4403'
-         WHEN kn LIKE 'Virke, sågat%'              THEN '4407'
-         WHEN kn LIKE 'Massa av ved%'              THEN '47'
-         WHEN kn LIKE 'Papper och papp%'           THEN '48'
+         WHEN raw.kn LIKE 'Trä och varor av trä%'      THEN '44'
+         WHEN raw.kn LIKE 'Brännved%'                  THEN '4401'
+         WHEN raw.kn LIKE 'Virke, obearbetat%'         THEN '4403'
+         WHEN raw.kn LIKE 'Virke, sågat%'              THEN '4407'
+         WHEN raw.kn LIKE 'Massa av ved%'              THEN '47'
+         WHEN raw.kn LIKE 'Papper och papp%'           THEN '48'
          ELSE 'other' END AS kn,
        CASE
-         WHEN kn LIKE 'Trä och varor av trä%'      THEN 'Trä totalt'
-         WHEN kn LIKE 'Brännved%'                  THEN 'Brännved och flis'
-         WHEN kn LIKE 'Virke, obearbetat%'         THEN 'Rundvirke'
-         WHEN kn LIKE 'Virke, sågat%'              THEN 'Sågade trävaror'
-         WHEN kn LIKE 'Massa av ved%'              THEN 'Massa'
-         WHEN kn LIKE 'Papper och papp%'           THEN 'Papper'
-         ELSE kn END AS kn_label
-FROM raw;
+         WHEN raw.kn LIKE 'Trä och varor av trä%'      THEN 'Trä totalt'
+         WHEN raw.kn LIKE 'Brännved%'                  THEN 'Brännved och flis'
+         WHEN raw.kn LIKE 'Virke, obearbetat%'         THEN 'Rundvirke'
+         WHEN raw.kn LIKE 'Virke, sågat%'              THEN 'Sågade trävaror'
+         WHEN raw.kn LIKE 'Massa av ved%'              THEN 'Massa'
+         WHEN raw.kn LIKE 'Papper och papp%'           THEN 'Papper'
+         ELSE raw.kn END AS kn_label
+FROM raw raw;
+
+CREATE OR REPLACE TABLE volumes_region AS
+SELECT CASE "Landsdel" WHEN 'Norra Norrland' THEN 'N Norrland'
+                       WHEN 'Södra Norrland' THEN 'S Norrland'
+                       ELSE "Landsdel" END AS region,
+       "Sortiment" AS assortment, CAST("År" AS INT) AS year,
+       CAST(value AS DOUBLE) AS m3fub
+FROM read_csv('data/raw/volumes_region_2019_2025.csv', header=true, all_varchar=true)
+WHERE value <> '';
 
 -- Roundwood prices per assortment and landsdel, 2019 onward. "Sortiment" is
 -- per species for the sawlog and pulpwood grades that matter here
@@ -461,16 +470,23 @@ SELECT
 FROM read_csv('data/raw/prices_region_2019_2025.csv', header=true, all_varchar=true)
 WHERE value <> '';
 
--- The long view: national prices in 2022 money, back to 1967/68. The older
--- regional table uses Nord/Mellan/Syd rather than the four landsdelar, so it is
--- deliberately not glued onto prices_region - the regionings do not align.
+-- The long view: national prices in 2022 money, back to 1967/68. (The older
+-- regional table is spliced onto prices_region further down, in prices_long,
+-- at the coarser Nord/Mellan/Syd resolution the two share.)
+-- Labels are a season block ("1967/68" ... "1995/96") followed by a calendar
+-- block ("1994" ... "2022"), and the two OVERLAP rather than switching cleanly:
+-- for three assortments both "1995/96" and "1995" carry a value, so taking the
+-- first four characters produced two rows for 1995. Where both exist the
+-- calendar label wins, since that is the basis the series continues on.
 CREATE OR REPLACE TABLE prices_real AS
-SELECT "Sortiment" AS assortment,
-       -- labels run "1967/68" until the series switches to calendar years
-       CAST(substr("År", 1, 4) AS INT) AS year,
-       CAST(value AS DOUBLE) AS kr_m3fub_2022
-FROM read_csv('data/raw/prices_real_1967_2022.csv', header=true, all_varchar=true)
-WHERE value <> '';
+SELECT assortment, year, kr_m3fub_2022 FROM (
+  SELECT "Sortiment" AS assortment,
+         CAST(substr("År", 1, 4) AS INT) AS year,
+         CAST(value AS DOUBLE) AS kr_m3fub_2022,
+         contains("År", '/') AS is_season
+  FROM read_csv('data/raw/prices_real_1967_2022.csv', header=true, all_varchar=true)
+  WHERE value <> ''
+) QUALIFY row_number() OVER (PARTITION BY assortment, year ORDER BY is_season) = 1;
 
 -- ---------------------------------------------------------------------------
 -- One price series 1995-2025, spliced from the two Skogsstyrelsen tables.
@@ -494,18 +510,25 @@ WITH old AS (
   FROM read_csv('data/raw/prices_region_1995_2021.csv', header=true, all_varchar=true)
   WHERE value <> '' AND "Region" <> 'Hela landet'
 ), new3 AS (
-  -- fold the landsdelar back to the old three regions
-  SELECT CASE WHEN region IN ('N Norrland','S Norrland') THEN 'Nord'
-              WHEN region = 'Svealand' THEN 'Mellan'
-              WHEN region = 'Götaland' THEN 'Syd' END AS region3,
-         assortment, year, avg(kr_m3fub) AS kr
-  FROM prices_region WHERE region <> 'Hela landet'
+  -- Fold the landsdelar back to the old three regions. Nord combines two
+  -- landsdelar, so the fold is VOLUME-WEIGHTED: a plain mean of two regional
+  -- prices is not the volume-weighted average the series claims to be, and for
+  -- pulpwood the two differ materially.
+  SELECT CASE WHEN p.region IN ('N Norrland','S Norrland') THEN 'Nord'
+              WHEN p.region = 'Svealand' THEN 'Mellan'
+              WHEN p.region = 'Götaland' THEN 'Syd' END AS region3,
+         p.assortment, p.year,
+         sum(p.kr_m3fub * coalesce(v.m3fub, 1)) / sum(coalesce(v.m3fub, 1)) AS kr
+  FROM prices_region p
+  LEFT JOIN volumes_region v
+    ON v.region = p.region AND v.assortment = p.assortment AND v.year = p.year
+  WHERE p.region <> 'Hela landet'
   GROUP BY 1, 2, 3
 )
 SELECT region3, assortment, year, round(kr, 1) AS kr_m3fub, 'Skogsstyrelsen 1995-2021' AS src
 FROM old WHERE year <= 2021
 UNION ALL
-SELECT region3, assortment, year, round(kr, 1), 'Skogsstyrelsen 2019-' 
+SELECT region3, assortment, year, round(kr, 1), 'Skogsstyrelsen 2019-'
 FROM new3 WHERE year >= 2022 AND region3 IS NOT NULL;
 
 -- How well the two agree in the overlap, kept so the page can state it rather
@@ -517,11 +540,15 @@ WITH old AS (
   FROM read_csv('data/raw/prices_region_1995_2021.csv', header=true, all_varchar=true)
   WHERE value <> '' AND "Region" <> 'Hela landet'
 ), new3 AS (
-  SELECT CASE WHEN region IN ('N Norrland','S Norrland') THEN 'Nord'
-              WHEN region = 'Svealand' THEN 'Mellan'
-              WHEN region = 'Götaland' THEN 'Syd' END AS region3,
-         assortment, year, avg(kr_m3fub) AS kr
-  FROM prices_region WHERE region <> 'Hela landet' GROUP BY 1,2,3
+  SELECT CASE WHEN p.region IN ('N Norrland','S Norrland') THEN 'Nord'
+              WHEN p.region = 'Svealand' THEN 'Mellan'
+              WHEN p.region = 'Götaland' THEN 'Syd' END AS region3,
+         p.assortment, p.year,
+         sum(p.kr_m3fub * coalesce(v.m3fub, 1)) / sum(coalesce(v.m3fub, 1)) AS kr
+  FROM prices_region p
+  LEFT JOIN volumes_region v
+    ON v.region = p.region AND v.assortment = p.assortment AND v.year = p.year
+  WHERE p.region <> 'Hela landet' GROUP BY 1,2,3
 )
 SELECT o.region3,
        round(avg(100*(n.kr - o.kr)/o.kr), 1) AS pct_diff,

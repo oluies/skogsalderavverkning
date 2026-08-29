@@ -31,6 +31,8 @@ function over calendar years, not a JavaScript loop.
 | Boundaries | Natural Earth 10m admin-1 | 21 counties |
 | Foreign trade in wood | SCB HA0201B (KN, by partner) | commodity × country, 1995–2025 |
 | Roundwood prices | Skogsstyrelsen, Rundvirkespriser | landsdel × assortment, 2019–2025 |
+| Roundwood prices, long | Skogsstyrelsen, older table | 3 regions × assortment, 1995–2021 |
+| Felled volumes | Skogsstyrelsen, older table | landsdel × assortment, 2019–2025 |
 | Roundwood prices, real | Skogsstyrelsen, Ekonomi tabell 4 | national, 1967/68–2022 |
 
 SLU's PxWeb API root is `https://skogsstatistik.slu.se/api/v1/sv/OffStat`
@@ -226,3 +228,17 @@ for that target; carrying two frontends cost more than it returned, and it was r
 
 Scala Steward runs with `GITHUB_TOKEN`, which is enough to open PRs but does not trigger
 workflows on them; swap in a PAT or GitHub App token if you want CI to run on its PRs.
+
+## Splicing the two price tables
+
+Skogsstyrelsen changed its regioning in 2019: the older table reports
+Nord/Mellan/Syd, the current one the four landsdelar. `prices_long` joins them
+at the coarser resolution the two share, folding the landsdelar back with a
+**volume-weighted** mean (an unweighted one would not be the volume-weighted
+average the series claims to be, and for pulpwood the two differ materially).
+
+The three overlap years let the seam be measured rather than assumed, and
+`prices_splice_check` keeps the result: Nord −1.3%, Syd −0.8%, **Mellan −6.3%**.
+Nord and Syd splice cleanly; Skogsstyrelsen's Mellan reaches further south than
+Svealand, so that region carries a real step at the join. The chart marks the
+seam year and the caption states the offset.

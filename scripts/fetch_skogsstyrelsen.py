@@ -25,6 +25,9 @@ TABLES = {
     "prices_region_2019_2025": "Rundvirkespriser/JO0303_1ny.px",
     # national, inflation-adjusted to 2022 money, back to 1967/68
     "prices_real_1967_2022": "Ekonomi/4_%20Prisutveckling%20pa%20leveransvirke.px",
+    # volumes, so folding landsdelar into the older three regions can be
+    # volume-weighted the way Skogsstyrelsen's own regional prices are
+    "volumes_region_2019_2025": "Rundvirkespriser/%C3%84ldre%20tabeller%20som%20inte%20uppdateras/JO0303_2ny.px",
 }
 
 
@@ -55,7 +58,8 @@ if __name__ == "__main__":
                   "selection": {"filter": "item", "values": v["values"]}}
                  for v in meta["variables"]]
         d = fetch(path, {"query": query, "response": {"format": "json-stat2"}})
-        json.dump(d, open(dest, "w"), ensure_ascii=False)
+        with open(dest, "w") as fh:
+            json.dump(d, fh, ensure_ascii=False)
         print(f"  {name} -> {dest} ({len(d.get('value', []))} cells)")
         time.sleep(3)
     print("done")

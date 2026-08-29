@@ -20,8 +20,10 @@ object Theme:
   def rule2     = cssVar("--rule-2")
   def panel     = cssVar("--panel")
   def panel2    = cssVar("--panel-2")
-  def pos       = cssVar("--pos")
-  def neg       = cssVar("--neg")
+
+  /** Fill for a county with no value. Distinct from the sequential ramp's
+    * lightest step, which is close enough to the panel to be mistaken for it. */
+  def noData    = cssVar("--nodata")
 
   /** Validated categorical slots, assigned in fixed order and never cycled. */
   def slots: Vector[String] =
@@ -51,6 +53,7 @@ object Theme:
   def poles(metric: String): (String, String) = metric match
     case "warming"                => (cssVar("--dvBlue"),  cssVar("--dvRed"))    // cold / warm
     case "precip" | "snow"        => (cssVar("--dvBrown"), cssVar("--dvBlue"))   // dry / wet
+    case "index"                  => (cssVar("--dvRed"),   cssVar("--dvBlue"))   // composite: no natural hue
     case _                        => (cssVar("--dvBrown"), cssVar("--dvGreen"))  // less / more growth
 
   /** Blend toward a pole for the diverging scale; t in [-1, 1]. */

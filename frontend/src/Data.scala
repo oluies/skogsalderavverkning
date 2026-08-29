@@ -273,8 +273,11 @@ object Queries:
       s"""SELECT region3, year, kr_m3fub FROM prices_long
           WHERE assortment = '$assortment' ORDER BY region3, year"""
     ).map { rows =>
+      // same hues as the landsdel view for the geography they overlap, so
+      // toggling between the two price views does not repaint the map of Sweden
+      val hue = Map("Nord" -> 0, "Mellan" -> 2, "Syd" -> 3)
       grouped(rows, "region3", "year", "kr_m3fub", region3,
-        k => Theme.slot(region3.indexOf(k)))
+        k => Theme.slot(hue.getOrElse(k, 0)))
     }
 
   /** National prices in 2022 money, back to 1967. */

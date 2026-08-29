@@ -349,8 +349,10 @@ object App:
             chart(620,
               drivers.signal.combineWith(weights.signal).combineWith(lang.signal)
                 .combineWith(themeTick.signal).map { (ds, w, _, _) =>
+                  // "index" is not a growth metric; keep it on the neutral
+                  // blue/red poles rather than inheriting brown/green
                   Charts.choropleth(indexValues(ds, w), tNow(K.tipIndex), "", 2, true,
-                                    noDataLabel = tNow(K.tipNoData))
+                                    noDataLabel = tNow(K.tipNoData), metric = "index")
                 }),
             div(
               div(cls := K.eyebrow, styleAttr := "margin-bottom:10px",
@@ -358,7 +360,7 @@ object App:
               chart(560,
                 drivers.signal.combineWith(weights.signal).combineWith(lang.signal)
                   .combineWith(themeTick.signal).map { (ds, w, _, _) =>
-                    Charts.ranked(indexValues(ds, w), tNow(K.tipIndex), "", 2, true)
+                    Charts.ranked(indexValues(ds, w), tNow(K.tipIndex), "", 2, true, "index")
                   })
             )
           ),
@@ -448,8 +450,10 @@ object App:
           div(cls := "ctrls",
             display <-- prView.signal.map(v => if v == "real" then "none" else "flex"),
             div(cls := "seg",
-              Queries.assortments.map { a =>
-                button(tpe := "button", a,
+              // the SQL values stay Swedish; the labels are translated, so the
+              // controls do not sit in Swedish inside an English page
+              Queries.assortments.zip(Vector(K.asTall, K.asGran, K.asBjork)).map { (a, key) =>
+                button(tpe := "button", child.text <-- t(key),
                   aria.pressed <-- prAssort.signal.map(x => (x == a).toString),
                   onClick.mapTo(a) --> prAssort)
               }
@@ -464,7 +468,10 @@ object App:
                     Charts.line(sx, tNow(K.axKrM3), zeroBased = true, decimals = 0, xStep = 1))
                 case "long" =>
                   Queries.pricesLong(prAssort.now()).map(sx =>
-                    Charts.line(sx, tNow(K.axKrM3), zeroBased = true, decimals = 0))
+                    // mark where the two source tables are joined, so a step at
+                    // the seam is not read as a price movement
+                    Charts.line(sx, tNow(K.axKrM3), zeroBased = true, decimals = 0,
+                                marks = Vector(2022 -> tNow(K.seam))))
                 case _ =>
                   Queries.pricesReal.map(sx =>
                     Charts.line(sx, tNow(K.axKrM3), zeroBased = true, decimals = 0))
