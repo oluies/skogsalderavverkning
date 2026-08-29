@@ -70,3 +70,10 @@ COPY (SELECT region3, assortment, year, kr_m3fub, src FROM prices_long)
 
 COPY (SELECT region3, pct_diff, n_pairs FROM prices_splice_check)
   TO 'site/data/prices_splice_check.parquet' (FORMAT parquet, COMPRESSION zstd);
+
+COPY (SELECT year, region, owner_group, measure, v FROM notifications)
+  TO 'site/data/notifications.parquet' (FORMAT parquet, COMPRESSION zstd);
+COPY (SELECT year, county, measure, v FROM denied_felling)
+  TO 'site/data/denied_felling.parquet' (FORMAT parquet, COMPRESSION zstd);
+COPY (SELECT year, region, measure, v FROM protection)
+  TO 'site/data/protection.parquet' (FORMAT parquet, COMPRESSION zstd);

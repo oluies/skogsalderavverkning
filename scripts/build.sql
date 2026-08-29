@@ -573,3 +573,49 @@ SELECT o.region3,
 FROM old o JOIN new3 n USING (region3, assortment, year)
 WHERE o.year BETWEEN 2019 AND 2021
 GROUP BY 1 ORDER BY 1;
+
+-- ===========================================================================
+-- 10. The regulatory side
+-- ===========================================================================
+-- A common claim is that owners fell early because they fear future
+-- restrictions - LULUCF, EU forest policy, domestic conservation. Felling
+-- NOTIFICATIONS are the place that would show: an owner must notify six weeks
+-- before felling, so the series records intent, not just outcome. These tables
+-- let the claim be tested rather than argued.
+
+CREATE OR REPLACE TABLE notifications AS
+SELECT CAST("År" AS INT) AS year,
+       -- the region codes carry a numeric prefix; strip it
+       trim(regexp_replace("Region", '^[0-9]+\s*', '')) AS region,
+       "Ägarkategori" AS owner_group,
+       CASE WHEN "Tabellinnehåll" LIKE 'Areal%' THEN 'ha' ELSE 'antal' END AS measure,
+       CAST(value AS DOUBLE) AS v
+FROM read_csv('data/raw/notifications_year.csv', header=true, all_varchar=true)
+WHERE value <> '';
+
+-- Felling actually refused, in montane forest. The series starts in 2020, when
+-- a Supreme Court ruling established the right to compensation for a refusal.
+CREATE OR REPLACE TABLE denied_felling AS
+SELECT CAST("År" AS INT) AS year,
+       trim(regexp_replace("Län", '^[0-9]+\s*', '')) AS county,
+       CASE "Antal, Areal"
+         WHEN 'Antal' THEN 'antal'
+         WHEN 'Ersättning, 1 000 kr' THEN 'tkr'
+         WHEN 'Produktiv skogsmarksareal, hektar' THEN 'ha'
+         ELSE 'landareal' END AS measure,
+       CAST(value AS DOUBLE) AS v
+FROM read_csv('data/raw/denied_fjallnara.csv', header=true, all_varchar=true)
+WHERE value <> '' AND "År" NOT LIKE 'Summa%';
+
+-- New habitat-protection orders per year: forest taken out of production.
+CREATE OR REPLACE TABLE protection AS
+SELECT CAST("År" AS INT) AS year,
+       trim(regexp_replace("Landsdel", '^[0-9]+\s*', '')) AS region,
+       CASE "Antal, Ersättning, Area"
+         WHEN 'Antal' THEN 'antal'
+         WHEN 'Ersättning, 1 000 kr' THEN 'tkr'
+         WHEN 'Produktiv skogsmarksareal, hektar' THEN 'ha'
+         ELSE 'landareal' END AS measure,
+       CAST(value AS DOUBLE) AS v
+FROM read_csv('data/raw/biotopskydd.csv', header=true, all_varchar=true)
+WHERE value <> '' AND "Biotoptyp" = 'Summa' AND "År" NOT LIKE 'Summa%';

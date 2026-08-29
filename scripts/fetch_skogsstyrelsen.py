@@ -28,6 +28,18 @@ TABLES = {
     # volumes, so folding landsdelar into the older three regions can be
     # volume-weighted the way Skogsstyrelsen's own regional prices are
     "volumes_region_2019_2025": "Rundvirkespriser/%C3%84ldre%20tabeller%20som%20inte%20uppdateras/JO0303_2ny.px",
+    # The regulatory side. Felling NOTIFICATIONS are forward-looking - an owner
+    # must notify six weeks before felling - so they show intent, and a surge
+    # ahead of an expected restriction would be visible here and nowhere else.
+    "notifications_year": "Avverkningsanmalan/"
+        "01_Antal%20och%20areal%20avverkningsanmalningar.px",
+    "notifications_month": "Avverkningsanmalan/05_Areal_anm_ans_per_manad.px",
+    # Felling actually refused, with the compensation paid for it.
+    "denied_fjallnara": "Skogsstyrelsens%20formella%20skydd%20och%20ersattningar/"
+        "07_JO1402_Lan_Ersattning.px",
+    # Habitat protection orders: felling prevented, area and compensation.
+    "biotopskydd": "Skogsstyrelsens%20formella%20skydd%20och%20ersattningar/"
+        "01_JO1402%20Biotopskydd.px",
 }
 
 

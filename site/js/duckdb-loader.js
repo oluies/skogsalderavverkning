@@ -18,7 +18,7 @@ const TABLES = [
   "drivers", "stand_type", "felling_species", "felling_type",
   "damage", "natural_loss", "meta",
   "wood_trade", "prices_region", "prices_real", "prices_long",
-  "prices_splice_check",
+  "prices_splice_check", "notifications", "denied_felling", "protection",
 ];
 
 async function boot() {

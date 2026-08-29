@@ -33,6 +33,9 @@ function over calendar years, not a JavaScript loop.
 | Roundwood prices | Skogsstyrelsen, Rundvirkespriser | landsdel × assortment, 2019–2025 |
 | Roundwood prices, long | Skogsstyrelsen, older table | 3 regions × assortment, 1995–2021 |
 | Felled volumes | Skogsstyrelsen, older table | landsdel × assortment, 2019–2025 |
+| Felling notifications | Skogsstyrelsen, Avverkningsanmälan | county × owner, 1995–2025 |
+| Refused felling (montane) | Skogsstyrelsen, formellt skydd tab. 7 | county, 2020–2025 |
+| Habitat protection | Skogsstyrelsen, formellt skydd tab. 1 | landsdel, 1994–2025 |
 | Roundwood prices, real | Skogsstyrelsen, Ekonomi tabell 4 | national, 1967/68–2022 |
 
 SLU's PxWeb API root is `https://skogsstatistik.slu.se/api/v1/sv/OffStat`
@@ -242,3 +245,21 @@ The three overlap years let the seam be measured rather than assumed, and
 Nord and Syd splice cleanly; Skogsstyrelsen's Mellan reaches further south than
 Svealand, so that region carries a real step at the join. The chart marks the
 seam year and the caption states the offset.
+
+## On the regulatory question
+
+Felling notifications are the one series that records *intent*: an owner must
+notify six weeks before felling. If fear of LULUCF or of domestic conservation
+were pulling harvest forward, it would appear there first. It does not — notified
+area moves between 214,000 and 293,000 ha since 2010 with no trend, and
+2024–2025 sit in the lower half of that range, in the north as much as the south.
+
+What did change is the cost of a refusal. After the 2020 Supreme Court ruling on
+compensation for denied felling in montane forest, 693 refusals covering 30,206
+ha of productive forest have been compensated at 1.21 billion SEK. That is large
+in money and small in area: the whole six-year total is a little over a tenth of
+a single year's notifications. Meanwhile new habitat protection peaked in 2018
+at 1,865 ha/yr and has run at 500–800 since 2020.
+
+No official statistics exist on obstruction of individual clear-cuts — that
+would be police or court records, not agency statistics.

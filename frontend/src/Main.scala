@@ -21,6 +21,7 @@ object App:
   private val trView   = Var("partner")
   private val prView   = Var("region")
   private val prAssort = Var("Tallsågtimmer")
+  private val rgView   = Var("notif")
   private val weights  = Var(Map("bonitet" -> 1.0, "temp" -> 1.0, "precip" -> 1.0, "snow" -> 0.0))
   private val drivers  = Var(Vector.empty[Driver])
   private val themeTick = Var(0)   // bumped on theme change to force re-render
@@ -481,6 +482,29 @@ object App:
               case "region" => K.capPrRegion
               case "long"   => K.capPrLong
               case _        => K.capPrReal)
+          })
+        )
+      ),
+
+      section(K.s12h, K.s12p,
+        Some(segmented(rgView, Vector(
+          "notif" -> K.rgNotif, "denied" -> K.rgDenied, "prot" -> K.rgProt))),
+        panel(
+          asyncChart(380,
+            rgView.signal.combineWith(themeTick.signal).mapTo(()),
+            () =>
+              val axis = if rgView.now() == "denied" then K.axCount else K.axHa
+              val f = rgView.now() match
+                case "denied" => Queries.deniedFelling
+                case "prot"   => Queries.protection
+                case _        => Queries.notifications
+              f.map(sx => Charts.line(sx, tNow(axis), zeroBased = true, decimals = 0))
+          ),
+          caption(lang.signal.combineWith(rgView.signal).map { (_, v) =>
+            tNow(v match
+              case "denied" => K.capRgDenied
+              case "prot"   => K.capRgProt
+              case _        => K.capRgNotif)
           })
         )
       ),

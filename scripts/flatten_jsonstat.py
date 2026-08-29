@@ -59,7 +59,9 @@ NAMES = ["fig49", "tab311a", "avv_tradslag_landsdel", "avv_huggningsarter",
          # SCB foreign trade and Skogsstyrelsen prices
          "scb_import_wood", "scb_export_wood",
          "prices_region_1995_2021", "prices_region_2019_2025",
-         "prices_real_1967_2022", "volumes_region_2019_2025"]
+         "prices_real_1967_2022", "volumes_region_2019_2025",
+         "notifications_year", "notifications_month",
+         "denied_fjallnara", "biotopskydd"]
 
 if __name__ == "__main__":
     import os

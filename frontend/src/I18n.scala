@@ -9,6 +9,16 @@ package skog
 object I18n:
 
   val sv: Map[String, String] = Map(
+    "s12h" -> "Hindrar reglerna avverkning?",
+    "s12p" -> "En vanlig farhåga är att LULUCF, EU:s skogspolitik och svenskt naturskydd ska stoppa avverkning — och att skogsägare därför avverkar i förtid. Anmälningarna är stället där det skulle synas: man måste anmäla sex veckor i förväg, så serien mäter avsikt.",
+    "rgNotif" -> "Anmäld avverkning",
+    "rgDenied" -> "Nekad avverkning",
+    "rgProt" -> "Nytt formellt skydd",
+    "capRgNotif" -> "Anmäld föryngringsavverkning, hektar per år och ägarkategori. Ingen förtida avverkningsvåg syns: arealen rör sig mellan 214 000 och 293 000 hektar sedan 2010, utan trend, och 2024–2025 ligger i det nedre spannet. Samma bild i norr som i söder. Farhågan är verklig men den syns inte i anmälningarna.",
+    "capRgDenied" -> "Avverkning som faktiskt nekats, i fjällnära skog. Serien börjar 2020, när Högsta domstolen slog fast rätten till ersättning vid nekat tillstånd. Sammanlagt 693 fall och 30 206 hektar produktiv skogsmark till en ersättning på 1,21 miljarder kronor. Stort i pengar, litet i areal: hela sexårsperioden motsvarar drygt en tiondels årsanmälan.",
+    "capRgProt" -> "Ny areal biotopskydd per år. Det formella skyddet ökar inte — det toppade 2018 på 1 865 hektar och ligger sedan 2020 kring 500–800.",
+    "axHa" -> "hektar/år",
+    "axCount" -> "antal",
     "asTall" -> "Tallsågtimmer",
     "asGran" -> "Gransågtimmer",
     "asMassa" -> "Massaved",
@@ -128,6 +138,16 @@ object I18n:
   )
 
   val en: Map[String, String] = Map(
+    "s12h" -> "Do the rules stop felling?",
+    "s12p" -> "A common fear is that LULUCF, EU forest policy and domestic conservation will prevent felling — and that owners therefore fell early. Notifications are where that would show: an owner must notify six weeks ahead, so the series records intent.",
+    "rgNotif" -> "Notified felling",
+    "rgDenied" -> "Refused felling",
+    "rgProt" -> "New formal protection",
+    "capRgNotif" -> "Notified regeneration felling, hectares per year by owner category. No wave of pre-emptive felling appears: the area moves between 214,000 and 293,000 hectares since 2010 with no trend, and 2024–2025 sit in the lower part of that range. The picture is the same in the north as in the south. The fear is real; it is not visible in the notifications.",
+    "capRgDenied" -> "Felling actually refused, in montane forest. The series begins in 2020, when the Supreme Court established the right to compensation for a refusal. In total 693 cases and 30,206 hectares of productive forest, compensated at 1.21 billion SEK. Large in money, small in area: the whole six-year period is a little over a tenth of one year's notifications.",
+    "capRgProt" -> "New habitat-protection area per year. Formal protection is not increasing — it peaked in 2018 at 1,865 hectares and has run at 500–800 since 2020.",
+    "axHa" -> "hectares/yr",
+    "axCount" -> "count",
     "asTall" -> "Pine sawlogs",
     "asGran" -> "Spruce sawlogs",
     "asMassa" -> "Pulpwood",

@@ -296,6 +296,53 @@ object Queries:
         k => Theme.slot(assortments.indexOf(k)))
     }
 
+  /** Notified felling area nationally, the forward-looking series.
+    *
+    * An owner must notify six weeks before felling, so a surge here would be
+    * the fingerprint of felling ahead of an expected restriction. Split by
+    * owner category because the claim is usually made about small private
+    * owners specifically.
+    */
+  def notifications: Future[Vector[Series]] =
+    val groups = Vector("Enskilda ägare", "Övriga")
+    SkogDb.query(
+      """SELECT owner_group, year, v FROM notifications
+         WHERE region = 'Hela landet' AND measure = 'ha'
+           AND owner_group <> 'Samtliga' ORDER BY owner_group, year"""
+    ).map { rows =>
+      grouped(rows, "owner_group", "year", "v", groups,
+        k => Theme.slot(groups.indexOf(k)))
+    }
+
+  /** Felling refused in montane forest: how many, and what it cost. */
+  def deniedFelling: Future[Vector[Series]] =
+    SkogDb.query(
+      """SELECT year, measure, v FROM denied_felling WHERE county = 'Hela Landet'
+         ORDER BY year"""
+    ).map { rows =>
+      val recs = rows.toVector.map(r =>
+        (Decode.str(r, "measure"), Decode.opt(r, "year"), Decode.opt(r, "v")))
+      def pick(m: String, scale: Double) =
+        recs.collect { case (k, Some(y), Some(v)) if k == m => Pt(y, v * scale) }.sortBy(_.x)
+      Vector(
+        Series("Antal", Theme.slot(1), pick("antal", 1.0)),
+        Series("Hektar", Theme.slot(3), pick("ha", 1.0))
+      ).filter(_.data.nonEmpty)
+    }
+
+  /** New habitat-protection orders per year: forest taken out of production. */
+  def protection: Future[Vector[Series]] =
+    SkogDb.query(
+      """SELECT year, measure, v FROM protection WHERE region = 'Hela landet'
+         ORDER BY year"""
+    ).map { rows =>
+      val recs = rows.toVector.map(r =>
+        (Decode.str(r, "measure"), Decode.opt(r, "year"), Decode.opt(r, "v")))
+      Vector(Series("Hektar", Theme.slot(3),
+        recs.collect { case ("ha", Some(y), Some(v)) => Pt(y, v) }.sortBy(_.x)))
+        .filter(_.data.nonEmpty)
+    }
+
   /** Figures quoted in prose, keyed by name. */
   def meta: Future[Map[String, Double]] =
     SkogDb.query("SELECT k, v FROM meta").map { rows =>
