@@ -33,3 +33,13 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           author-email: orjan.lundberg@gmail.com
           author-name: Scala Steward
+          # Steward reads a scala-cli project by running `scala-cli --power
+          # export --sbt` and then loading the result with sbt. From scala-cli
+          # 1.15.0 that export writes sbt.version=2.x, and sbt-scalajs is not
+          # published for sbt 2 - so every run died resolving
+          # org.scala-js:sbt-scalajs_sbt2_3:1.20.1. 1.14.0 is the last release
+          # whose export pins sbt 1.x. This only affects how Steward reads the
+          # dependencies; the site is built by the scala-cli in pages.yml, which
+          # tracks the current release. Drop the pin once sbt-scalajs ships for
+          # sbt 2, or once Steward passes --sbt-version to the export.
+          scala-cli-version: 1.14.0
