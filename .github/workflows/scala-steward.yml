@@ -27,9 +27,32 @@ jobs:
 
       - uses: scala-steward-org/scala-steward-action@v2
         with:
-          # GITHUB_TOKEN is enough to open PRs. Note that PRs it opens will not
-          # themselves trigger workflows - swap in a PAT or GitHub App token if
-          # you want CI to run on Steward's PRs.
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          # GITHUB_TOKEN opens PRs here only because this repository allows it.
+          # `pull-requests: write` above is necessary and not sufficient: the
+          # repository setting "Allow GitHub Actions to create and approve pull
+          # requests" (Settings -> Actions -> General) gates it as well, and with
+          # that off the POST returns
+          #
+          #   403 GitHub Actions is not permitted to create or approve pull
+          #       requests
+          #
+          # after Steward has already pushed its branch. The result is a pushed
+          # `update/*` branch with no PR and a red workflow, which reads as a
+          # Steward fault rather than a settings one. That is not hypothetical:
+          # it is what oluies/p4rt-examples did for a week, and this repository
+          # differs only in having the setting enabled.
+          #
+          # STEWARD_TOKEN removes the dependency on that setting, because a PAT
+          # is not subject to it. Unset today, and the fallback keeps the
+          # workflow working; set it to a fine-grained token scoped to this
+          # repository with Contents: RW and Pull requests: RW.
+          #
+          # The previous note here also claimed PRs opened with GITHUB_TOKEN do
+          # not trigger workflows. That is the documented rule, but it does not
+          # hold in this repository: #2 `update/toolchain` was opened by Steward
+          # under GITHUB_TOKEN and `pages.yml` still ran its `build` job on it.
+          # Removed rather than repeated, since acting on it would mean adding a
+          # PAT for a problem this repository does not have.
+          github-token: ${{ secrets.STEWARD_TOKEN || secrets.GITHUB_TOKEN }}
           author-email: orjan.lundberg@gmail.com
           author-name: Scala Steward
