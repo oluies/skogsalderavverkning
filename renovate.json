@@ -1,0 +1,27 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "description": [
+    "Replaces .github/dependabot.yml, so one bot owns dependency updates here.",
+    "",
+    "Scoped to github-actions on purpose. The Scala side of this repository is",
+    "scala-cli `//> using` directives in frontend/project.scala, which Renovate has",
+    "no manager for -- Scala Steward reads them (.github/workflows/scala-steward.yml)",
+    "and is left in place. Renovate and Steward therefore do not overlap.",
+    "",
+    "The old Dependabot config carried this note, kept because it is still true:",
+    "it keeps the Pages workflow's actions current, and the Node 20 deprecation",
+    "warning is exactly what it is here to surface."
+  ],
+  "enabledManagers": ["github-actions"],
+  "schedule": ["before 6am on monday"],
+  "timezone": "Europe/Stockholm",
+  "packageRules": [
+    {
+      "description": "Was the github-actions 'actions' group (patterns: *), weekly, 'ci' commit prefix.",
+      "matchManagers": ["github-actions"],
+      "groupName": "actions",
+      "semanticCommitType": "ci"
+    }
+  ]
+}
